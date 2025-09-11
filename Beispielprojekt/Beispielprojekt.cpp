@@ -1,37 +1,16 @@
 #include <Gosu/Gosu.hpp>
 #include <Gosu/AutoLink.hpp>
+#include "GameWindow.hpp"
 
-class GameWindow : public Gosu::Window
-{
-public:
-
-	GameWindow()
-		: Window(800, 600)
-	{
-		set_caption("Gosu Tutorial mit Git");
-	}
-
-	// Wird bis zu 60x pro Sekunde aufgerufen.
-	// Wenn die Grafikkarte oder der Prozessor nicht mehr hinterherkommen,
-	// dann werden `draw` Aufrufe ausgelassen und die Framerate sinkt
-	void draw() override
-	{
-		graphics().draw_line(
-			10, 20, Gosu::Color::RED,
-			200, 100, Gosu::Color::GREEN,
-			0.0
-		);
-	}
-
-	// Wird 60x pro Sekunde aufgerufen
-	void update() override
-	{
-	}
-};
-
-// C++ Hauptprogramm
-int main()
-{
-	GameWindow window;
-	window.show();
+int main(int argc, char* argv[]) {
+    // Fenstergröße (Standard: 2 Spieler)
+    unsigned width = 800, height = 600;
+    int players = 2;
+    if (argc > 1) {
+        int p = std::atoi(argv[1]);
+        if (p >= 2 && p <= 4) players = p;
+    }
+    GameWindow window(width, height, players);
+    window.show();
+    return 0;
 }
