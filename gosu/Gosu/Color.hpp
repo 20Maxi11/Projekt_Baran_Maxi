@@ -28,6 +28,7 @@ namespace Gosu
         
         //! The default constructor does not initialize the color to any value.
         Color()
+            :rep(0)
         {
         }
         
