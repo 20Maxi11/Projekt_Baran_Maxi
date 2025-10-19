@@ -175,6 +175,7 @@
     <ClCompile Include="GameWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="..\..\..\..\..\Downloads\Test.png" />
     <Image Include="..\..\Billard SVG Dateien\Kugel 0 weiß.png" />
     <Image Include="..\..\Billard SVG Dateien\Kugel 1 gelb voll.png" />
     <Image Include="..\..\Billard SVG Dateien\Kugel 10 blau halb.png" />
