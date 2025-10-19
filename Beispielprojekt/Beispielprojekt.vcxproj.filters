@@ -32,6 +32,60 @@
     <Image Include="rakete.png">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="..\..\Billard SVG Dateien\Tisch.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 0 weiß.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 1 gelb voll.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 2 blau voll.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 3 rot voll.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 4 lila voll.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 5 orange voll.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 6 türkis voll.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 7 weinrot voll.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 8 schwarz voll.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 9 gelb halb.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 10 blau halb.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 11 rot halb.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 12 lila halb.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 13 orange halb.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 14 türkis halb.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Kugel 15 weinrot halb.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="..\..\Billard SVG Dateien\Queue.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Ball.hpp">
