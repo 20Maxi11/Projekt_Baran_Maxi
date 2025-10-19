@@ -27,6 +27,9 @@
     <ClCompile Include="GameWindow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TestImages.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="rakete.png">
@@ -84,6 +87,9 @@
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="..\..\Billard SVG Dateien\Queue.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Test.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

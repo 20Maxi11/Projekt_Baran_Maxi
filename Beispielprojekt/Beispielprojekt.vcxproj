@@ -173,9 +173,9 @@
     <ClCompile Include="Billard.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameWindow.cpp" />
+    <ClCompile Include="TestImages.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="..\..\..\..\..\Downloads\Test.png" />
     <Image Include="..\..\Billard SVG Dateien\Kugel 0 weiß.png" />
     <Image Include="..\..\Billard SVG Dateien\Kugel 1 gelb voll.png" />
     <Image Include="..\..\Billard SVG Dateien\Kugel 10 blau halb.png" />
@@ -195,6 +195,7 @@
     <Image Include="..\..\Billard SVG Dateien\Queue.png" />
     <Image Include="..\..\Billard SVG Dateien\Tisch.png" />
     <Image Include="rakete.png" />
+    <Image Include="Test.png" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Ball.hpp" />
