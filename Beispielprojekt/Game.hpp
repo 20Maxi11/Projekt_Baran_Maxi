@@ -9,6 +9,7 @@ class Game {
 public:
     Game(double tableWidth, double tableHeight, int players = 2);
 
+    // Innenmaß des grünen Bereichs (links,oben,rechts,unten)
     void set_playfield(double left, double top, double right, double bottom);
 
     bool allStopped() const;
@@ -29,13 +30,13 @@ public:
     const std::vector<Ball>& balls() const;
 
     double W, H;            // Fenstergröße (Info)
-    double pocketR = 24.0;  // Taschengröße
+    double pocketR = 24.0;  // Taschenradius
 
 private:
-    // Spielbereich (Innenmaß des grünen Tisches)
+    // Spielbereich (Innenmaß des Filzes)
     double L_ = 0, T_ = 0, R_ = 0, B_ = 0;
 
-    double friction_ = 0.99;
+    double friction_ = 0.99; // Reibung
 
     Ball cueBall_;
     std::vector<Ball> balls_;
@@ -59,11 +60,11 @@ private:
         std::vector<int> pocketedIds;
     } turn_;
 
-    void placeTriangle();
-    void step(Ball& b);
-    void wall(Ball& b) const;          // <- jetzt const
-    bool pocket(const Ball& b) const;
-    void collide(Ball& a, Ball& b);
+    void placeTriangle();             // 8-Ball Aufbau
+    void step(Ball& b);               // Position+Reibung
+    void wall(Ball& b) const;         // Bandenabprall
+    bool pocket(const Ball& b) const; // versenkt?
+    void collide(Ball& a, Ball& b);   // elastischer Stoß
     void handleCollisions();
     void assignGroupsIfNeeded();
     void resolveTurnIfStopped();

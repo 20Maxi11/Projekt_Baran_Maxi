@@ -5,14 +5,48 @@
 
 static inline double clamp01(double x) { return std::max(0.0, std::min(1.0, x)); }
 
-GameWindow::GameWindow(unsigned width, unsigned height, int /*players*/)
-    : Gosu::Window(width, height, false, 60.0)
-    , game_(width, height, 2)
+GameWindow::GameWindow(unsigned width, unsigned height, int /*players*/, bool fullscreen)
+    : Gosu::Window(width, height, fullscreen, 60.0),
+    game_(width, height, 2)
 {
-    set_caption("Gosu Billard");
-    set_resizable(true);
+    set_caption("Gosu Billard (Bilder)");
+    loadAssets();
     ensureFonts();
     computeTableRect();
+}
+
+void GameWindow::loadAssets() {
+    try { felt_ = std::make_unique<Gosu::Image>("assets/Tisch.png"); }
+    catch (...) {}
+    try { cueImg_ = std::make_unique<Gosu::Image>("assets/Queue.png"); }
+    catch (...) {}
+    for (int i = 0; i < 16; ++i) {
+        try { ballImg_[i] = std::make_unique<Gosu::Image>(ballFile(i)); }
+        catch (...) { ballImg_[i].reset(); }
+    }
+}
+
+std::string GameWindow::ballFile(int id) {
+    // Dateinamen (mit Leerzeichen/‹mlauten)
+    switch (id) {
+    case  0: return "assets/Kugel 0 weiﬂ.png";
+    case  1: return "assets/Kugel 1 gelb voll.png";
+    case  2: return "assets/Kugel 2 blau voll.png";
+    case  3: return "assets/Kugel 3 rot voll.png";
+    case  4: return "assets/Kugel 4 lila voll.png";
+    case  5: return "assets/Kugel 5 orange voll.png";
+    case  6: return "assets/Kugel 6 t¸rkis voll.png";
+    case  7: return "assets/Kugel 7 weinrot voll.png";
+    case  8: return "assets/Kugel 8 schwarz voll.png";
+    case  9: return "assets/Kugel 9 gelb halb.png";
+    case 10: return "assets/Kugel 10 blau halb.png";
+    case 11: return "assets/Kugel 11 rot halb.png";
+    case 12: return "assets/Kugel 12 lila halb.png";
+    case 13: return "assets/Kugel 13 orange halb.png";
+    case 14: return "assets/Kugel 14 t¸rkis halb.png";
+    case 15: return "assets/Kugel 15 weinrot halb.png";
+    default: return "";
+    }
 }
 
 double GameWindow::rail() const {
@@ -31,25 +65,23 @@ void GameWindow::ensureFonts() {
 }
 
 void GameWindow::computeTableRect() {
-    // ÑRaumì-Rand (schwarzer Bereich um den Tisch)
-    double roomPad = std::max(20.0, std::min(width(), height()) * 0.07); // ~7% Auﬂenrand
-    double availW = std::max(1.0, width() - 2 * roomPad);
-    double availH = std::max(1.0, height() - 2 * roomPad);
+    // schwarzer ÑRaumì
+    double pad = std::max(20.0, std::min(width(), height()) * 0.07);
+    double availW = std::max(1.0, width() - 2 * pad);
+    double availH = std::max(1.0, height() - 2 * pad);
 
-    // Tisch im Verh‰ltnis 2:1 (Breite:Hˆhe) maximal ins Fenster einpassen
-    const double aspect = 2.0; // klassisches Poolmaﬂ
-    double w = availW;
-    double h = w / aspect;
+    // 2:1-Tisch
+    const double aspect = 2.0;
+    double w = availW, h = w / aspect;
     if (h > availH) { h = availH; w = h * aspect; }
 
-    tableW_ = w;
-    tableH_ = h;
+    tableW_ = w; tableH_ = h;
     tableX_ = (width() - tableW_) / 2.0;
     tableY_ = (height() - tableH_) / 2.0;
 }
 
 void GameWindow::layoutStartBoxes() {
-    computeTableRect(); // bei Resizes konsistent
+    computeTableRect();
     double r = rail(), bh = std::max(36.0, height() * 0.06);
     double bx = tableX_ + tableW_ * 0.18, bw = tableW_ * 0.64;
     double y1 = tableY_ + r + tableH_ * 0.20, y2 = y1 + bh + std::max(24.0, height() * 0.05);
@@ -61,11 +93,10 @@ void GameWindow::update() {
     ensureFonts();
     computeTableRect();
 
-    // Innenmaﬂ (gr¸ner Filz) ans Game melden
+    // Innenmaﬂ (Filz) -> Game
     double r = rail();
     double px = tableX_ + r, py = tableY_ + r;
     double pw = tableW_ - 2 * r, ph = tableH_ - 2 * r;
-
     game_.W = width(); game_.H = height();
     game_.set_playfield(px, py, px + pw, py + ph);
 
@@ -79,6 +110,8 @@ void GameWindow::update() {
         double d = std::sqrt(dx * dx + dy * dy);
         power_ = clamp01(std::min(300.0, d) / 300.0);
     }
+
+    if (cueAnimFrames_ > 0) --cueAnimFrames_;
 
     game_.update();
     if (game_.isOver()) state_ = UiState::GameOver;
@@ -102,12 +135,14 @@ void GameWindow::drawTextShadow(Gosu::Font& f, const std::string& s, double x, d
 
 void GameWindow::drawAim() {
     if (!game_.allStopped() || game_.isOver()) return;
+
     const Ball& c = game_.cue();
     double dx = aimX_ - c.x, dy = aimY_ - c.y;
     double d = std::sqrt(dx * dx + dy * dy);
     if (d < 1.0) return;
     double nx = dx / d, ny = dy / d;
 
+    // gestrichelte Ziellinie
     double len = std::min(d, 340.0);
     Gosu::Color lc(200, 255, 255, 255);
     const int dashN = 24;
@@ -118,19 +153,26 @@ void GameWindow::drawAim() {
         Gosu::Graphics::draw_line(x0, y0, lc, x1, y1, lc, 3);
     }
 
-    double back = 40 + 160 * power_;
-    double bx1 = c.x - nx * (c.r + back), by1 = c.y - ny * (c.r + back);
-    double bx2 = c.x - nx * (c.r), by2 = c.y - ny * (c.r);
-    double qx = -ny * 3, qy = nx * 3;
-    Gosu::Color qc(220, 200, 180, 180);
-    Gosu::Graphics::draw_triangle(bx1 - qx, by1 - qy, qc, bx1 + qx, by1 + qy, qc, bx2 + qx, by2 + qy, qc, 2);
-    Gosu::Graphics::draw_triangle(bx1 - qx, by1 - qy, qc, bx2 - qx, by2 - qy, qc, bx2 + qx, by2 + qy, qc, 2);
+    // Queue-Bild: mitziehen beim Ausholen, kurzer Vorw‰rtsstoﬂ nach Loslassen
+    if (cueImg_) {
+        const double baseBack = 40.0;
+        double back = baseBack + 160.0 * power_;
+        if (cueAnimFrames_ > 0) {
+            // nach dem Schuss schnell nach vorn (optische Animation)
+            double t = cueAnimFrames_ / 10.0; // 10 Frames
+            back *= t;
+        }
 
-    // Powerbar
-    double bw = std::max(180.0, width() * 0.18), bh = std::max(10.0, height() * 0.015);
-    double bx = 10, by = height() - (bh + 10);
-    Gosu::Graphics::draw_rect(bx, by, bw, bh, Gosu::Color(180, 30, 30, 30), 2);
-    Gosu::Graphics::draw_rect(bx, by, bw * power_, bh, Gosu::Color(255, 220, 0, 255), 3);
+        double angleDeg = std::atan2(dy, dx) * 180.0 / 3.14159265;
+        double s = std::max(0.35, tableH_ / 900.0);   // Skala abh‰ngig von Tischhˆhe
+        double cueLen = cueImg_->width() * s;
+
+        // Mittelpunkt der Queue etwas hinter der weiﬂen Kugel
+        double cx = c.x - nx * (c.r + back + cueLen * 0.5);
+        double cy = c.y - ny * (c.r + back + cueLen * 0.5);
+
+        cueImg_->draw_rot(cx, cy, 4, angleDeg, 0.5, 0.5, s, s);
+    }
 }
 
 void GameWindow::drawHud() {
@@ -157,15 +199,22 @@ void GameWindow::drawHud() {
 void GameWindow::drawStart() {
     layoutStartBoxes();
 
-    // kompletter Hintergrund schwarz (Raum)
+    // Raum
     Gosu::Graphics::draw_rect(0, 0, width(), height(), Gosu::Color::BLACK, 0);
 
-    // Holz-Rail + gr¸ner Filz (wie im Spiel)
+    // Tisch
     double r = rail();
-    Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(255, 90, 60, 30), 1);               // Holz
-    Gosu::Graphics::draw_rect(tableX_ + r, tableY_ + r, tableW_ - 2 * r, tableH_ - 2 * r, Gosu::Color(30, 120, 40, 255), 2);  // gr¸n
+    Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(255, 90, 60, 30), 1);
+    if (felt_) {
+        double sx = (tableW_ - 2 * r) / felt_->width();
+        double sy = (tableH_ - 2 * r) / felt_->height();
+        felt_->draw(tableX_ + r, tableY_ + r, 2, sx, sy);
+    }
+    else {
+        Gosu::Graphics::draw_rect(tableX_ + r, tableY_ + r, tableW_ - 2 * r, tableH_ - 2 * r,
+            Gosu::Color(30, 120, 40, 255), 2);
+    }
 
-    // UI
     std::string title = "8-Ball ñ Namen eingeben";
     double tw = fontTitle_->text_width(title);
     drawTextShadow(*fontTitle_, title, (width() - tw) / 2, tableY_ + r * 0.5, 3, Gosu::Color::WHITE);
@@ -195,7 +244,8 @@ void GameWindow::drawPause() {
 
     std::string info = "P: Zurueck   |   N: Neues Spiel   |   ESC: Beenden";
     double iw = font_->text_width(info);
-    drawTextShadow(*font_, info, (width() - iw) / 2, tableY_ + rail() + 20 + fontTitle_->height() + 8, 11, Gosu::Color(255, 220, 0, 255));
+    drawTextShadow(*font_, info, (width() - iw) / 2, tableY_ + rail() + 20 + fontTitle_->height() + 8, 11,
+        Gosu::Color(255, 220, 0, 255));
 }
 
 void GameWindow::drawGameOver() {
@@ -207,17 +257,26 @@ void GameWindow::drawGameOver() {
 
     std::string info = "N: Neues Match   |   R: Neu aufbauen   |   ESC: Beenden";
     double iw = font_->text_width(info);
-    drawTextShadow(*font_, info, (width() - iw) / 2, tableY_ + rail() + 20 + fontTitle_->height() + 8, 11, Gosu::Color(255, 220, 0, 255));
+    drawTextShadow(*font_, info, (width() - iw) / 2, tableY_ + rail() + 20 + fontTitle_->height() + 8, 11,
+        Gosu::Color(255, 220, 0, 255));
 }
 
 void GameWindow::draw() {
-    // Raum: schwarz
+    // Raum
     Gosu::Graphics::draw_rect(0, 0, width(), height(), Gosu::Color::BLACK, 0);
 
-    // Holz-Rail + gr¸ner Filz (zentriert, 2:1)
+    // Tisch
     double r = rail();
-    Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(255, 90, 60, 30), 1);              // Holz
-    Gosu::Graphics::draw_rect(tableX_ + r, tableY_ + r, tableW_ - 2 * r, tableH_ - 2 * r, Gosu::Color(30, 120, 40, 255), 2); // gr¸n
+    Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(255, 90, 60, 30), 1); // Holz
+    if (felt_) {
+        double sx = (tableW_ - 2 * r) / felt_->width();
+        double sy = (tableH_ - 2 * r) / felt_->height();
+        felt_->draw(tableX_ + r, tableY_ + r, 2, sx, sy);
+    }
+    else {
+        Gosu::Graphics::draw_rect(tableX_ + r, tableY_ + r, tableW_ - 2 * r, tableH_ - 2 * r,
+            Gosu::Color(30, 120, 40, 255), 2);
+    }
 
     // Taschen (an Innenmaﬂ!)
     Gosu::Color pc = Gosu::Color::BLACK;
@@ -230,11 +289,19 @@ void GameWindow::draw() {
     drawCircle(ix + iw / 2.0, iy, pr, pc, 3, 22);
     drawCircle(ix + iw / 2.0, iy + ih, pr, pc, 3, 22);
 
-    // Kugeln
+    // Kugeln (Bilder zentriert und skaliert auf Radius)
     auto drawBall = [&](const Ball& b) {
         if (!b.inPlay) return;
-        drawCircle(b.x, b.y, b.r, b.color, 4, 28);
-        drawCircle(b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.30, Gosu::Color(180, 255, 255, 255), 5, 14);
+        auto& img = ballImg_[b.id];
+        if (img) {
+            double sx = (2 * b.r) / img->width();
+            double sy = (2 * b.r) / img->height();
+            img->draw_rot(b.x, b.y, 4, 0.0, 0.5, 0.5, sx, sy);
+        }
+        else {
+            // Fallback: weiﬂer Kreis
+            drawCircle(b.x, b.y, b.r, Gosu::Color::WHITE, 4, 28);
+        }
         };
     for (const Ball& b : game_.balls()) drawBall(b);
     drawBall(game_.cue());
@@ -256,9 +323,10 @@ void GameWindow::shootFromAim() {
     double d = std::sqrt(dx * dx + dy * dy);
     if (d < 1.0) return;
     double nx = dx / d, ny = dy / d;
-    double force = 6.0 + 20.0 * power_;
+    double force = 6.0 + 20.0 * power_;  // Stoﬂst‰rke
     c.vx = -nx * force; c.vy = -ny * force;
     game_.beginShot();
+    cueAnimFrames_ = 10; // kurzer Vorw‰rtsstoﬂ der Queue
 }
 
 void GameWindow::togglePause() {
@@ -279,14 +347,8 @@ void GameWindow::handleNameKey(Gosu::Button b) {
     if (b == Gosu::KB_BACKSPACE) { if (!s.empty()) s.pop_back(); return; }
     if (b == Gosu::KB_RETURN) { startMatch(); return; }
 
-    if (b >= Gosu::KB_A && b <= Gosu::KB_Z) {
-        char ch = 'A' + (int(b) - int(Gosu::KB_A));
-        s.push_back(ch); return;
-    }
-    if (b >= Gosu::KB_0 && b <= Gosu::KB_9) {
-        char ch = '0' + (int(b) - int(Gosu::KB_0));
-        s.push_back(ch); return;
-    }
+    if (b >= Gosu::KB_A && b <= Gosu::KB_Z) { char ch = 'A' + (int(b) - int(Gosu::KB_A)); s.push_back(ch); return; }
+    if (b >= Gosu::KB_0 && b <= Gosu::KB_9) { char ch = '0' + (int(b) - int(Gosu::KB_0)); s.push_back(ch); return; }
     if (b == Gosu::KB_SPACE) { s.push_back(' '); return; }
     if (b == Gosu::KB_MINUS) { s.push_back('-'); return; }
 }
@@ -294,7 +356,6 @@ void GameWindow::handleNameKey(Gosu::Button b) {
 void GameWindow::button_down(Gosu::Button b) {
     Gosu::Window::button_down(b);
 
-    // Startscreen: Maus klickt Feld
     if (b == Gosu::MS_LEFT && state_ == UiState::Start) {
         layoutStartBoxes();
         double mx = input().mouse_x(), my = input().mouse_y();
@@ -309,11 +370,9 @@ void GameWindow::button_down(Gosu::Button b) {
         return;
     }
 
-    // Gameplay
     if (b == Gosu::MS_LEFT && state_ == UiState::Playing && game_.allStopped() && !game_.isOver())
         dragging_ = true;
 
-    // Global
     if (b == Gosu::KB_P && (state_ == UiState::Playing || state_ == UiState::Paused)) togglePause();
     if (b == Gosu::KB_R && state_ != UiState::Start) game_.reset(true);
     if (b == Gosu::KB_N && state_ != UiState::Start) { game_.reset(false); state_ = UiState::Playing; }

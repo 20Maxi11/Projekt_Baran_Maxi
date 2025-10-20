@@ -4,6 +4,7 @@
 #include <Gosu/Gosu.hpp>
 #include <memory>
 #include <string>
+#include <array>
 #include "Game.hpp"
 
 struct RectF {
@@ -15,7 +16,8 @@ struct RectF {
 
 class GameWindow : public Gosu::Window {
 public:
-    GameWindow(unsigned width, unsigned height, int players = 2);
+    // fullscreen = true -> festes Vollbild (empfohlen)
+    GameWindow(unsigned width, unsigned height, int players = 2, bool fullscreen = true);
 
     void update() override;
     void draw() override;
@@ -32,24 +34,31 @@ private:
     bool   dragging_ = false;
     double aimX_ = 0.0, aimY_ = 0.0;
     double power_ = 0.0;
+    int    cueAnimFrames_ = 0; // kurze Vorwärts-Animation nach dem Stoß
 
-    // Spielernamen
+    // Spielernamen (Startbild)
     std::string p1Name_ = "Spieler 1";
     std::string p2Name_ = "Spieler 2";
     int activeName_ = 0;
+    RectF p1Box_, p2Box_;
 
     // Fonts
     std::unique_ptr<Gosu::Font> font_, fontTitle_;
     double lastW_ = 0, lastH_ = 0;
 
-    // Startscreen Felder
-    RectF p1Box_, p2Box_;
-
     // Tisch-Geometrie (zentriert, 2:1)
     double tableX_ = 0, tableY_ = 0, tableW_ = 0, tableH_ = 0;
 
+    // Assets
+    std::unique_ptr<Gosu::Image> felt_;      // Tisch
+    std::unique_ptr<Gosu::Image> cueImg_;    // Queue
+    std::array<std::unique_ptr<Gosu::Image>, 16> ballImg_; // 0..15
+
+    void loadAssets();
+    static std::string ballFile(int id);
+
     // Layout / Hilfen
-    double rail() const;         // Bandendicke relativ zur Tischgröße
+    double rail() const;         // Bandendicke relativ
     void ensureFonts();
     void layoutStartBoxes();
     void computeTableRect();     // berechnet tableX_/Y_/W_/H_

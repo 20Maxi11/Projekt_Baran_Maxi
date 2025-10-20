@@ -1,3 +1,2 @@
 #include "Ball.hpp"
-
-//Kolisonliogikt in Game.cpp
+// Logik in Game.cpp

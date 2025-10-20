@@ -6,7 +6,7 @@ static inline double len(double x, double y) { return std::sqrt(x * x + y * y); 
 
 Game::Game(double tableWidth, double tableHeight, int /*players*/)
     : W(tableWidth), H(tableHeight),
-    cueBall_(0, BallType::CUE, W * 0.22, H * 0.5, Gosu::Color::WHITE, 10.0) {
+    cueBall_(0, BallType::CUE, W * 0.22, H * 0.5, 10.0) {
     set_playfield(0, 0, W, H);
     reset(false);
 }
@@ -14,6 +14,12 @@ Game::Game(double tableWidth, double tableHeight, int /*players*/)
 void Game::set_playfield(double left, double top, double right, double bottom) {
     L_ = left; T_ = top; R_ = right; B_ = bottom;
     pocketR = std::max(cueBall_.r * 1.6, 20.0);
+}
+
+static BallType typeById(int id) {
+    if (id == 8) return BallType::EIGHT;
+    if (id >= 1 && id <= 7) return BallType::SOLID;
+    return BallType::STRIPE; // 9..15
 }
 
 void Game::reset(bool keepScores) {
@@ -34,44 +40,12 @@ void Game::reset(bool keepScores) {
     placeTriangle();
 }
 
-// Standardfarben 8-Ball (1..7 Voll, 8 Schwarz, 9..15 Halbe = etwas heller)
-static Gosu::Color solidColor(int n) {
-    switch (n) {
-    case 1: return Gosu::Color(255, 235, 200, 0); // gelb
-    case 2: return Gosu::Color(255, 30, 90, 220); // blau
-    case 3: return Gosu::Color(255, 220, 40, 40); // rot
-    case 4: return Gosu::Color(255, 110, 50, 180); // violett
-    case 5: return Gosu::Color(255, 250, 140, 20); // orange
-    case 6: return Gosu::Color(255, 40, 140, 50); // grün
-    case 7: return Gosu::Color(255, 150, 30, 30); // bordeaux
-    case 8: return Gosu::Color::BLACK;              // schwarz
-    default:return Gosu::Color(255, 200, 200, 200);
-    }
-}
-static Gosu::Color lighten(const Gosu::Color& c, int delta = 28) {
-    int r = std::min(255, int(c.red()) + delta);
-    int g = std::min(255, int(c.green()) + delta);
-    int b = std::min(255, int(c.blue()) + delta);
-    return Gosu::Color(c.alpha(), (unsigned char)r, (unsigned char)g, (unsigned char)b);
-}
-static Gosu::Color colorById(int id) {
-    if (id == 8) return solidColor(8);
-    if (id >= 1 && id <= 7) return solidColor(id);
-    // 9..15: Halbe -> aufgehellte Voll-Farbe
-    return lighten(solidColor(id - 8));
-}
-static BallType typeById(int id) {
-    if (id == 8) return BallType::EIGHT;
-    if (id >= 1 && id <= 7) return BallType::SOLID;
-    return BallType::STRIPE;
-}
-
 void Game::placeTriangle() {
     double Wp = R_ - L_, Hp = B_ - T_;
     const double d = cueBall_.r * 2.05;
     double sx = L_ + Wp * 0.68, sy = T_ + Hp * 0.5;
 
-    // 1 vorne, 8 in der Mitte, hintere Ecken: links Voll (2), rechts Halb (14)
+    // 8-Ball Aufbau (1 vorn, 8 in Mitte, Ecken: 2 und 14)
     int ids[15] = {
         1,
         10, 4,
@@ -86,7 +60,7 @@ void Game::placeTriangle() {
             int id = ids[k++];
             double x = sx + row * d * std::sqrt(3.0) / 2.0;
             double y = sy + (i - row * 0.5) * d;
-            balls_.emplace_back(id, typeById(id), x, y, colorById(id), 10.0);
+            balls_.emplace_back(id, typeById(id), x, y, 10.0);
         }
     }
 }
@@ -105,15 +79,8 @@ int Game::remainingStripes() const {
     int n = 0; for (const auto& b : balls_) if (b.inPlay && b.type == BallType::STRIPE) ++n; return n;
 }
 
-void Game::beginShot() {
-    shotActive_ = true;
-    turn_ = {};
-    firstHitBallId_.reset();
-}
-
-void Game::notifyCueHitBall(int id) {
-    if (!firstHitBallId_.has_value()) firstHitBallId_ = id;
-}
+void Game::beginShot() { shotActive_ = true; turn_ = {}; firstHitBallId_.reset(); }
+void Game::notifyCueHitBall(int id) { if (!firstHitBallId_.has_value()) firstHitBallId_ = id; }
 
 bool Game::isOwnType(const Ball& b, int player) const {
     if (!groupsAssigned_) return false;
@@ -130,6 +97,7 @@ void Game::step(Ball& b) {
 }
 
 void Game::wall(Ball& b) const {
+    // Abprall an Innenkante
     if (b.x - b.r < L_) { b.x = L_ + b.r; b.vx = -b.vx; }
     if (b.x + b.r > R_) { b.x = R_ - b.r; b.vx = -b.vx; }
     if (b.y - b.r < T_) { b.y = T_ + b.r; b.vy = -b.vy; }
@@ -153,19 +121,23 @@ void Game::collide(Ball& a, Ball& b) {
     double rr = a.r + b.r;
     double dist2 = dx * dx + dy * dy;
     if (dist2 <= 0 || dist2 >= rr * rr) return;
+
     double d = std::sqrt(dist2);
     double nx = dx / d, ny = dy / d;
 
+    // Überlappung auseinander schieben
     double overlap = rr - d;
     a.x -= nx * overlap / 2; a.y -= ny * overlap / 2;
     b.x += nx * overlap / 2; b.y += ny * overlap / 2;
 
+    // Geschwindigkeiten in Normal-/Tangentialanteil zerlegen
     double vaN = a.vx * nx + a.vy * ny;
     double vbN = b.vx * nx + b.vy * ny;
     double tx = -ny, ty = nx;
     double vaT = a.vx * tx + a.vy * ty;
     double vbT = b.vx * tx + b.vy * ty;
 
+    // Elastischer Stoß gleicher Massen: Normalanteile tauschen
     double vaNn = vbN, vbNn = vaN;
     a.vx = vaNn * nx + vaT * tx; a.vy = vaNn * ny + vaT * ty;
     b.vx = vbNn * nx + vbT * tx; b.vy = vbNn * ny + vbT * ty;
@@ -213,7 +185,8 @@ void Game::resolveTurnIfStopped() {
                 bool ownRemaining = false;
                 if (playerGroup_[currentTeam_].has_value()) {
                     BallType own = playerGroup_[currentTeam_].value();
-                    ownRemaining = (own == BallType::SOLID) ? (remainingSolids() > 0) : (remainingStripes() > 0);
+                    ownRemaining = (own == BallType::SOLID) ? (remainingSolids() > 0)
+                        : (remainingStripes() > 0);
                 }
                 if (ownRemaining) turn_.foul = true;
             }
@@ -230,7 +203,8 @@ void Game::resolveTurnIfStopped() {
         bool ownCleared = false;
         if (groupsAssigned_) {
             BallType own = playerGroup_[currentTeam_].value_or(BallType::SOLID);
-            ownCleared = (own == BallType::SOLID) ? (remainingSolids() == 0) : (remainingStripes() == 0);
+            ownCleared = (own == BallType::SOLID) ? (remainingSolids() == 0)
+                : (remainingStripes() == 0);
         }
         if (!turn_.foul && ownCleared) { gameOver_ = true; winnerTeam_ = currentTeam_; }
         else { gameOver_ = true; winnerTeam_ = 1 - currentTeam_; }
@@ -257,7 +231,7 @@ void Game::update() {
     step(cueBall_);
     for (auto& b : balls_) step(b);
 
-    // Weiße versenkt -> Foul, zurück auf Break-Linie (Innenmaß)
+    // Weiße versenkt -> Foul, zurück auf Break-Linie
     if (!cueBall_.inPlay || pocket(cueBall_)) {
         double Wp = R_ - L_, Hp = B_ - T_;
         cueBall_.x = L_ + Wp * 0.22; cueBall_.y = T_ + Hp * 0.5;

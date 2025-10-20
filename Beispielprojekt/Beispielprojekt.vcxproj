@@ -173,7 +173,6 @@
     <ClCompile Include="Billard.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GameWindow.cpp" />
-    <ClCompile Include="TestImages.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\..\Billard SVG Dateien\Kugel 0 weiß.png" />
