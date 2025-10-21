@@ -16,9 +16,9 @@ GameWindow::GameWindow(unsigned width, unsigned height, int /*players*/, bool fu
 }
 
 void GameWindow::loadAssets() {
-    try { felt_ = std::make_unique<Gosu::Image>("assets/Tisch.png"); }
+    try { felt_ = std::make_unique<Gosu::Image>("Tisch.png"); }
     catch (...) {}
-    try { cueImg_ = std::make_unique<Gosu::Image>("assets/Queue.png"); }
+    try { cueImg_ = std::make_unique<Gosu::Image>("Queue.png"); }
     catch (...) {}
     for (int i = 0; i < 16; ++i) {
         try { ballImg_[i] = std::make_unique<Gosu::Image>(ballFile(i)); }
@@ -29,22 +29,22 @@ void GameWindow::loadAssets() {
 std::string GameWindow::ballFile(int id) {
     // Dateinamen (mit Leerzeichen/Ümlauten)
     switch (id) {
-    case  0: return "assets/Kugel 0 weiß.png";
-    case  1: return "assets/Kugel 1 gelb voll.png";
-    case  2: return "assets/Kugel 2 blau voll.png";
-    case  3: return "assets/Kugel 3 rot voll.png";
-    case  4: return "assets/Kugel 4 lila voll.png";
-    case  5: return "assets/Kugel 5 orange voll.png";
-    case  6: return "assets/Kugel 6 türkis voll.png";
-    case  7: return "assets/Kugel 7 weinrot voll.png";
-    case  8: return "assets/Kugel 8 schwarz voll.png";
-    case  9: return "assets/Kugel 9 gelb halb.png";
-    case 10: return "assets/Kugel 10 blau halb.png";
-    case 11: return "assets/Kugel 11 rot halb.png";
-    case 12: return "assets/Kugel 12 lila halb.png";
-    case 13: return "assets/Kugel 13 orange halb.png";
-    case 14: return "assets/Kugel 14 türkis halb.png";
-    case 15: return "assets/Kugel 15 weinrot halb.png";
+    case  0: return "Kugel 0 weiß.png";
+    case  1: return "Kugel 1 gelb voll.png";
+    case  2: return "Kugel 2 blau voll.png";
+    case  3: return "Kugel 3 rot voll.png";
+    case  4: return "Kugel 4 lila voll.png";
+    case  5: return "Kugel 5 orange voll.png";
+    case  6: return "Kugel 6 türkis voll.png";
+    case  7: return "Kugel 7 weinrot voll.png";
+    case  8: return "Kugel 8 schwarz voll.png";
+    case  9: return "Kugel 9 gelb halb.png";
+    case 10: return "Kugel 10 blau halb.png";
+    case 11: return "Kugel 11 rot halb.png";
+    case 12: return "Kugel 12 lila halb.png";
+    case 13: return "Kugel 13 orange halb.png";
+    case 14: return "Kugel 14 türkis halb.png";
+    case 15: return "Kugel 15 weinrot halb.png";
     default: return "";
     }
 }
