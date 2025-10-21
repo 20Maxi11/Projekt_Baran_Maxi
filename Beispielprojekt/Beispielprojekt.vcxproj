@@ -175,31 +175,31 @@
     <ClCompile Include="GameWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="..\..\Billard SVG Dateien\Kugel 0 weiß.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 1 gelb voll.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 10 blau halb.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 11 rot halb.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 12 lila halb.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 13 orange halb.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 14 türkis halb.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 15 weinrot halb.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 2 blau voll.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 3 rot voll.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 4 lila voll.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 5 orange voll.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 6 türkis voll.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 7 weinrot voll.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 8 schwarz voll.png" />
-    <Image Include="..\..\Billard SVG Dateien\Kugel 9 gelb halb.png" />
-    <Image Include="..\..\Billard SVG Dateien\Queue.png" />
-    <Image Include="..\..\Billard SVG Dateien\Tisch.png" />
-    <Image Include="rakete.png" />
-    <Image Include="Test.png" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="Ball.hpp" />
     <ClInclude Include="Game.hpp" />
     <ClInclude Include="GameWindow.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Kugel 0 weiß.png" />
+    <Image Include="Kugel 1 gelb voll.png" />
+    <Image Include="Kugel 10 blau halb.png" />
+    <Image Include="Kugel 11 rot halb.png" />
+    <Image Include="Kugel 12 lila halb.png" />
+    <Image Include="Kugel 13 orange halb.png" />
+    <Image Include="Kugel 14 türkis halb.png" />
+    <Image Include="Kugel 15 weinrot halb.png" />
+    <Image Include="Kugel 2 blau voll.png" />
+    <Image Include="Kugel 3 rot voll.png" />
+    <Image Include="Kugel 4 lila voll.png" />
+    <Image Include="Kugel 5 orange voll.png" />
+    <Image Include="Kugel 6 türkis voll.png" />
+    <Image Include="Kugel 7 weinrot voll.png" />
+    <Image Include="Kugel 8 schwarz voll.png" />
+    <Image Include="Kugel 9 gelb halb.png" />
+    <Image Include="Queue.png" />
+    <Image Include="rakete.png" />
+    <Image Include="Test.png" />
+    <Image Include="Tisch.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
