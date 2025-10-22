@@ -4,22 +4,27 @@
 
 static inline double len(double x, double y) { return std::sqrt(x * x + y * y); }
 
+static BallType typeById(int id) {
+    if (id == 8) return BallType::EIGHT;
+    if (id >= 1 && id <= 7) return BallType::SOLID;
+    return BallType::STRIPE;
+}
+
 Game::Game(double tableWidth, double tableHeight, int /*players*/)
     : W(tableWidth), H(tableHeight),
-    cueBall_(0, BallType::CUE, W * 0.22, H * 0.5, 10.0) {
+    cueBall_(0, BallType::CUE, W * 0.22, H * 0.5, defaultBallRadius())
+{
     set_playfield(0, 0, W, H);
     reset(false);
 }
 
 void Game::set_playfield(double left, double top, double right, double bottom) {
     L_ = left; T_ = top; R_ = right; B_ = bottom;
-    pocketR = std::max(cueBall_.r * 1.6, 20.0);
+    pocketR = std::max(defaultBallRadius() * 1.6, 20.0); // Fallback an neue Größe koppeln
 }
 
-static BallType typeById(int id) {
-    if (id == 8) return BallType::EIGHT;
-    if (id >= 1 && id <= 7) return BallType::SOLID;
-    return BallType::STRIPE; // 9..15
+void Game::set_pockets(std::vector<PocketGeom> pockets) {
+    pockets_ = std::move(pockets);
 }
 
 void Game::reset(bool keepScores) {
@@ -35,6 +40,7 @@ void Game::reset(bool keepScores) {
     double Wp = R_ - L_, Hp = B_ - T_;
     cueBall_.x = L_ + Wp * 0.22; cueBall_.y = T_ + Hp * 0.5;
     cueBall_.vx = cueBall_.vy = 0; cueBall_.inPlay = true;
+    cueBall_.r = defaultBallRadius();
 
     balls_.clear();
     placeTriangle();
@@ -42,10 +48,9 @@ void Game::reset(bool keepScores) {
 
 void Game::placeTriangle() {
     double Wp = R_ - L_, Hp = B_ - T_;
-    const double d = cueBall_.r * 2.05;
+    const double d = defaultBallRadius() * 2.05;
     double sx = L_ + Wp * 0.68, sy = T_ + Hp * 0.5;
 
-    // 8-Ball Aufbau (1 vorn, 8 in Mitte, Ecken: 2 und 14)
     int ids[15] = {
         1,
         10, 4,
@@ -60,7 +65,7 @@ void Game::placeTriangle() {
             int id = ids[k++];
             double x = sx + row * d * std::sqrt(3.0) / 2.0;
             double y = sy + (i - row * 0.5) * d;
-            balls_.emplace_back(id, typeById(id), x, y, 10.0);
+            balls_.emplace_back(id, typeById(id), x, y, defaultBallRadius());
         }
     }
 }
@@ -97,7 +102,6 @@ void Game::step(Ball& b) {
 }
 
 void Game::wall(Ball& b) const {
-    // Abprall an Innenkante
     if (b.x - b.r < L_) { b.x = L_ + b.r; b.vx = -b.vx; }
     if (b.x + b.r > R_) { b.x = R_ - b.r; b.vx = -b.vx; }
     if (b.y - b.r < T_) { b.y = T_ + b.r; b.vy = -b.vy; }
@@ -105,12 +109,24 @@ void Game::wall(Ball& b) const {
 }
 
 bool Game::pocket(const Ball& b) const {
+    auto L2 = [](double dx, double dy) { return dx * dx + dy * dy; };
+
+    if (!pockets_.empty()) {
+        for (const auto& p : pockets_) {
+            double dx = b.x - p.x, dy = b.y - p.y;
+            double rr = (p.r + b.r * 0.35);
+            if (L2(dx, dy) <= rr * rr) return true;
+        }
+        return false;
+    }
+
+    // Fallback: 6 Standardpositionen an den Ecken/Mitte
     struct P { double x, y; };
     P p[6] = {
         {L_,T_},{R_,T_},{L_,B_},{R_,B_},{(L_ + R_) / 2.0,T_},{(L_ + R_) / 2.0,B_}
     };
     for (auto& q : p) {
-        if (len(b.x - q.x, b.y - q.y) <= pocketR + b.r * 0.35) return true;
+        if (L2(b.x - q.x, b.y - q.y) <= (pocketR + b.r * 0.35) * (pocketR + b.r * 0.35)) return true;
     }
     return false;
 }
@@ -125,19 +141,16 @@ void Game::collide(Ball& a, Ball& b) {
     double d = std::sqrt(dist2);
     double nx = dx / d, ny = dy / d;
 
-    // Überlappung auseinander schieben
     double overlap = rr - d;
     a.x -= nx * overlap / 2; a.y -= ny * overlap / 2;
     b.x += nx * overlap / 2; b.y += ny * overlap / 2;
 
-    // Geschwindigkeiten in Normal-/Tangentialanteil zerlegen
     double vaN = a.vx * nx + a.vy * ny;
     double vbN = b.vx * nx + b.vy * ny;
     double tx = -ny, ty = nx;
     double vaT = a.vx * tx + a.vy * ty;
     double vbT = b.vx * tx + b.vy * ty;
 
-    // Elastischer Stoß gleicher Massen: Normalanteile tauschen
     double vaNn = vbN, vbNn = vaN;
     a.vx = vaNn * nx + vaT * tx; a.vy = vaNn * ny + vaT * ty;
     b.vx = vbNn * nx + vbT * tx; b.vy = vbNn * ny + vbT * ty;
@@ -174,28 +187,6 @@ void Game::resolveTurnIfStopped() {
     if (anyMoving_ || !shotActive_) return;
 
     if (!firstHitBallId_.has_value()) turn_.foul = true;
-    else {
-        int firstId = firstHitBallId_.value();
-        BallType firstType = typeById(firstId);
-        if (!groupsAssigned_) {
-            if (firstType == BallType::EIGHT) turn_.foul = true;
-        }
-        else {
-            if (firstType == BallType::EIGHT) {
-                bool ownRemaining = false;
-                if (playerGroup_[currentTeam_].has_value()) {
-                    BallType own = playerGroup_[currentTeam_].value();
-                    ownRemaining = (own == BallType::SOLID) ? (remainingSolids() > 0)
-                        : (remainingStripes() > 0);
-                }
-                if (ownRemaining) turn_.foul = true;
-            }
-            else if (playerGroup_[currentTeam_].has_value() &&
-                playerGroup_[currentTeam_].value() != firstType) {
-                turn_.foul = true;
-            }
-        }
-    }
 
     assignGroupsIfNeeded();
 
@@ -203,8 +194,7 @@ void Game::resolveTurnIfStopped() {
         bool ownCleared = false;
         if (groupsAssigned_) {
             BallType own = playerGroup_[currentTeam_].value_or(BallType::SOLID);
-            ownCleared = (own == BallType::SOLID) ? (remainingSolids() == 0)
-                : (remainingStripes() == 0);
+            ownCleared = (own == BallType::SOLID) ? (remainingSolids() == 0) : (remainingStripes() == 0);
         }
         if (!turn_.foul && ownCleared) { gameOver_ = true; winnerTeam_ = currentTeam_; }
         else { gameOver_ = true; winnerTeam_ = 1 - currentTeam_; }
@@ -231,11 +221,12 @@ void Game::update() {
     step(cueBall_);
     for (auto& b : balls_) step(b);
 
-    // Weiße versenkt -> Foul, zurück auf Break-Linie
+    // Weiße versenkt -> zurücksetzen (Foul)
     if (!cueBall_.inPlay || pocket(cueBall_)) {
         double Wp = R_ - L_, Hp = B_ - T_;
         cueBall_.x = L_ + Wp * 0.22; cueBall_.y = T_ + Hp * 0.5;
         cueBall_.vx = cueBall_.vy = 0; cueBall_.inPlay = true;
+        cueBall_.r = defaultBallRadius();
         turn_.foul = true; turn_.anyPocket = true;
     }
 

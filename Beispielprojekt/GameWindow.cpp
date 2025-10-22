@@ -2,8 +2,56 @@
 #include <algorithm>
 #include <cmath>
 #include <sstream>
+#include <Gosu/Bitmap.hpp>
 
 static inline double clamp01(double x) { return std::max(0.0, std::min(1.0, x)); }
+
+// Heuristiken für PNG-Analyse
+static inline bool isGreen(int r, int g, int b) { return g > 70 && g > int(r * 1.15) && g > int(b * 1.15); }
+static inline bool isDark(int r, int g, int b) { return r < 40 && g < 40 && b < 40; }
+
+// ---------- Rendering- und Lade-Optionen ----------
+static constexpr double kBallImageScale = 1.00;     // *** WICHTIG: 1.00 -> Physik bestimmt Größe ***/ da sonst bilder ienfach nur größer dargestl werdne aber physik nicht passt 
+static constexpr double kBallShadowMul = 1.06;
+static constexpr double kBallShadow_dx = 2.0;
+static constexpr double kBallShadow_dy = 2.0;
+static constexpr int    kBallSegments = 28;
+
+static constexpr unsigned kBallImageFlags =
+#ifdef IF_RETRO
+Gosu::IF_RETRO;
+#else
+Gosu::IF_SMOOTH;
+#endif
+
+// ---------- robustes Image-Loading ----------
+static std::string ascii_fallback(std::string s) {
+    auto repl = [&](const std::string& from, const std::string& to) {
+        size_t pos = 0;
+        while ((pos = s.find(from, pos)) != std::string::npos) { s.replace(pos, from.size(), to); pos += to.size(); }
+        };
+    repl("ä", "ae"); repl("ö", "oe"); repl("ü", "ue");
+    repl("Ä", "Ae"); repl("Ö", "Oe"); repl("Ü", "Ue");
+    repl("ß", "ss");
+    return s;
+}
+static std::string no_spaces(std::string s) {
+    s.erase(std::remove(s.begin(), s.end(), ' '), s.end());
+    return s;
+}
+static std::unique_ptr<Gosu::Image> try_load_variants(const std::string& baseName, unsigned flags) {
+    std::vector<std::string> cand = {
+        baseName,
+        ascii_fallback(baseName),
+        no_spaces(baseName),
+        no_spaces(ascii_fallback(baseName))
+    };
+    for (const auto& f : cand) {
+        try { return std::make_unique<Gosu::Image>(f, flags); }
+        catch (...) { /* nächste Variante */ }
+    }
+    return nullptr;
+}
 
 GameWindow::GameWindow(unsigned width, unsigned height, int /*players*/, bool fullscreen)
     : Gosu::Window(width, height, fullscreen, 60.0),
@@ -16,41 +64,49 @@ GameWindow::GameWindow(unsigned width, unsigned height, int /*players*/, bool fu
 }
 
 void GameWindow::loadAssets() {
-    try { felt_ = std::make_unique<Gosu::Image>("Tisch.png"); }
+    // Tisch & Queue
+    try { felt_ = try_load_variants("Tisch.png", Gosu::IF_SMOOTH); }
     catch (...) {}
-    try { cueImg_ = std::make_unique<Gosu::Image>("Queue.png"); }
+    if (!felt_) { try { felt_ = std::make_unique<Gosu::Image>("Tisch.png", Gosu::IF_SMOOTH); } catch (...) {} }
+
+    try { cueImg_ = try_load_variants("Queue.png", Gosu::IF_SMOOTH); }
     catch (...) {}
+    if (!cueImg_) { try { cueImg_ = std::make_unique<Gosu::Image>("Queue.png", Gosu::IF_SMOOTH); } catch (...) {} }
+
+    // Kugeln 0..15
     for (int i = 0; i < 16; ++i) {
-        try { ballImg_[i] = std::make_unique<Gosu::Image>(ballFile(i)); }
-        catch (...) { ballImg_[i].reset(); }
+        auto name = ballFile(i);
+        ballImg_[i] = try_load_variants(name, kBallImageFlags);
+        if (!ballImg_[i]) {
+            try { ballImg_[i] = std::make_unique<Gosu::Image>(std::to_string(i) + ".png", kBallImageFlags); }
+            catch (...) {}
+        }
     }
 }
 
 std::string GameWindow::ballFile(int id) {
-    // Dateinamen (mit Leerzeichen/Ümlauten)
     switch (id) {
-    case  0: return "Kugel 0 weiß.png";
-    case  1: return "Kugel 1 gelb voll.png";
-    case  2: return "Kugel 2 blau voll.png";
-    case  3: return "Kugel 3 rot voll.png";
-    case  4: return "Kugel 4 lila voll.png";
-    case  5: return "Kugel 5 orange voll.png";
-    case  6: return "Kugel 6 türkis voll.png";
-    case  7: return "Kugel 7 weinrot voll.png";
-    case  8: return "Kugel 8 schwarz voll.png";
-    case  9: return "Kugel 9 gelb halb.png";
-    case 10: return "Kugel 10 blau halb.png";
-    case 11: return "Kugel 11 rot halb.png";
-    case 12: return "Kugel 12 lila halb.png";
-    case 13: return "Kugel 13 orange halb.png";
-    case 14: return "Kugel 14 türkis halb.png";
-    case 15: return "Kugel 15 weinrot halb.png";
+    case  0: return "Kugel_0_weiss.png";
+    case  1: return "Kugel_1_gelb_voll.png";
+    case  2: return "Kugel_2_blau_voll.png";
+    case  3: return "Kugel_3_rot_voll.png";
+    case  4: return "Kugel_4_lila_voll.png";
+    case  5: return "Kugel_5_orange_voll.png";
+    case  6: return "Kugel_6_tuerkis_voll.png";
+    case  7: return "Kugel_7_weinrot_voll.png";
+    case  8: return "Kugel_8_schwarz_voll.png";
+    case  9: return "Kugel_9_gelb_halb.png";
+    case 10: return "Kugel_10_blau_halb.png";
+    case 11: return "Kugel_11_rot_halb.png";
+    case 12: return "Kugel_12_lila_halb.png";
+    case 13: return "Kugel_13_orange_halb.png";
+    case 14: return "Kugel_14_tuerkis_halb.png";
+    case 15: return "Kugel_15_weinrot_halb.png";
     default: return "";
     }
 }
 
 double GameWindow::rail() const {
-    // 5% der kleineren Tischkante, min 18, max 56
     double r = std::min(tableW_, tableH_) * 0.05;
     return std::max(18.0, std::min(56.0, r));
 }
@@ -65,12 +121,10 @@ void GameWindow::ensureFonts() {
 }
 
 void GameWindow::computeTableRect() {
-    // schwarzer „Raum“
     double pad = std::max(20.0, std::min(width(), height()) * 0.07);
     double availW = std::max(1.0, width() - 2 * pad);
     double availH = std::max(1.0, height() - 2 * pad);
 
-    // 2:1-Tisch
     const double aspect = 2.0;
     double w = availW, h = w / aspect;
     if (h > availH) { h = availH; w = h * aspect; }
@@ -89,16 +143,104 @@ void GameWindow::layoutStartBoxes() {
     p2Box_ = { bx, y2, bw, bh };
 }
 
+// ---------- PNG ANALYSE ----------
+void GameWindow::analyzeTableImage() {
+    if (!felt_) return;
+
+    Gosu::Bitmap bmp = felt_->data().to_bitmap();
+    const int imgW = (int)bmp.width();
+    const int imgH = (int)bmp.height();
+
+    int minX = imgW, minY = imgH, maxX = 0, maxY = 0;
+    for (int y = 0; y < imgH; ++y) for (int x = 0; x < imgW; ++x) {
+        Gosu::Color c = bmp.get_pixel(x, y);
+        int r = c.red(), g = c.green(), b = c.blue();
+        if (isGreen(r, g, b)) {
+            if (x < minX) minX = x; if (x > maxX) maxX = x;
+            if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+    }
+    if (minX < maxX && minY < maxY) {
+        feltNorm_.l = double(minX) / imgW; feltNorm_.r = double(maxX) / imgW;
+        feltNorm_.t = double(minY) / imgH; feltNorm_.b = double(maxY) / imgH;
+        feltOk_ = true;
+    }
+    else {
+        feltNorm_ = { 0.08,0.08,0.92,0.92 };
+        feltOk_ = false;
+    }
+
+    const double cx = (feltNorm_.l + feltNorm_.r) * 0.5;
+    const double cy = (feltNorm_.t + feltNorm_.b) * 0.5;
+    const std::array<std::pair<double, double>, 6> guesses = { {
+        {feltNorm_.l, feltNorm_.t}, {feltNorm_.r, feltNorm_.t},
+        {feltNorm_.l, feltNorm_.b}, {feltNorm_.r, feltNorm_.b},
+        {cx,           feltNorm_.t}, {cx,           feltNorm_.b}
+    } };
+
+    const int win = std::max(10, std::min(imgW, imgH) / 20);
+    auto clampi = [](int v, int lo, int hi) { return std::max(lo, std::min(hi, v)); };
+
+    for (int i = 0; i < 6; ++i) {
+        int gx = int(guesses[i].first * imgW), gy = int(guesses[i].second * imgH);
+        int x0 = clampi(gx - win, 0, imgW - 1), x1 = clampi(gx + win, 0, imgW - 1);
+        int y0 = clampi(gy - win, 0, imgH - 1), y1 = clampi(gy + win, 0, imgH - 1);
+
+        long long sx = 0, sy = 0, n = 0; double maxR2 = 0.0;
+
+        for (int y = y0; y <= y1; ++y) for (int x = x0; x <= x1; ++x) {
+            Gosu::Color c = bmp.get_pixel(x, y);
+            if (!isDark(c.red(), c.green(), c.blue())) continue;
+            sx += x; sy += y; ++n;
+        }
+
+        double cxp = gx, cyp = gy;
+        if (n > 50) {
+            cxp = double(sx) / n; cyp = double(sy) / n;
+            for (int y = y0; y <= y1; ++y) for (int x = x0; x <= x1; ++x) {
+                Gosu::Color c = bmp.get_pixel(x, y);
+                if (!isDark(c.red(), c.green(), c.blue())) continue;
+                double dx = x - cxp, dy = y - cyp; double d2 = dx * dx + dy * dy; if (d2 > maxR2) maxR2 = d2;
+            }
+        }
+        else {
+            maxR2 = (win * 0.6) * (win * 0.6);
+        }
+
+        pocketsNorm_[i].nx = cxp / imgW;
+        pocketsNorm_[i].ny = cyp / imgH;
+        pocketsNorm_[i].nr = std::max(0.01, std::min(0.08, std::sqrt(maxR2) / double(std::min(imgW, imgH))));
+    }
+}
+
+// ---------- Normdaten -> Bildschirm & Game ----------
+void GameWindow::rebuildGameGeomFromNorm() {
+    double ix = tableX_ + feltNorm_.l * tableW_;
+    double iy = tableY_ + feltNorm_.t * tableH_;
+    double iw = (feltNorm_.r - feltNorm_.l) * tableW_;
+    double ih = (feltNorm_.b - feltNorm_.t) * tableH_;
+    game_.set_playfield(ix, iy, ix + iw, iy + ih);
+
+    std::vector<PocketGeom> P; P.reserve(6);
+    double shortEdge = std::min(tableW_, tableH_);
+    for (const auto& pn : pocketsNorm_) {
+        double px = tableX_ + pn.nx * tableW_;
+        double py = tableY_ + pn.ny * tableH_;
+        double pr = pn.nr * shortEdge;
+        P.push_back({ px, py, pr });
+    }
+    game_.set_pockets(P);
+}
+
 void GameWindow::update() {
     ensureFonts();
     computeTableRect();
 
-    // Innenmaß (Filz) -> Game
-    double r = rail();
-    double px = tableX_ + r, py = tableY_ + r;
-    double pw = tableW_ - 2 * r, ph = tableH_ - 2 * r;
+    static bool analyzed = false;
+    if (!analyzed) { analyzeTableImage(); analyzed = true; }
+
     game_.W = width(); game_.H = height();
-    game_.set_playfield(px, py, px + pw, py + ph);
+    rebuildGameGeomFromNorm();
 
     if (state_ != UiState::Playing) return;
 
@@ -117,6 +259,7 @@ void GameWindow::update() {
     if (game_.isOver()) state_ = UiState::GameOver;
 }
 
+// Hilfs-Kreis (Schatten/Outline)
 void GameWindow::drawCircle(double cx, double cy, double r, Gosu::Color color, double z, int seg) {
     const double step = 2 * 3.14159265358979323846 / seg;
     double px = cx + r, py = cy;
@@ -142,7 +285,6 @@ void GameWindow::drawAim() {
     if (d < 1.0) return;
     double nx = dx / d, ny = dy / d;
 
-    // gestrichelte Ziellinie
     double len = std::min(d, 340.0);
     Gosu::Color lc(200, 255, 255, 255);
     const int dashN = 24;
@@ -153,25 +295,22 @@ void GameWindow::drawAim() {
         Gosu::Graphics::draw_line(x0, y0, lc, x1, y1, lc, 3);
     }
 
-    // Queue-Bild: mitziehen beim Ausholen, kurzer Vorwärtsstoß nach Loslassen
     if (cueImg_) {
         const double baseBack = 40.0;
         double back = baseBack + 160.0 * power_;
         if (cueAnimFrames_ > 0) {
-            // nach dem Schuss schnell nach vorn (optische Animation)
-            double t = cueAnimFrames_ / 10.0; // 10 Frames
+            double t = cueAnimFrames_ / 10.0;
             back *= t;
         }
 
         double angleDeg = std::atan2(dy, dx) * 180.0 / 3.14159265;
-        double s = std::max(0.35, tableH_ / 900.0);   // Skala abhängig von Tischhöhe
+        double s = std::max(0.35, tableH_ / 900.0);
         double cueLen = cueImg_->width() * s;
 
-        // Mittelpunkt der Queue etwas hinter der weißen Kugel
-        double cx = c.x - nx * (c.r + back + cueLen * 0.5);
-        double cy = c.y - ny * (c.r + back + cueLen * 0.5);
+        double cxp = c.x - nx * (c.r + back + cueLen * 0.5);
+        double cyp = c.y - ny * (c.r + back + cueLen * 0.5);
 
-        cueImg_->draw_rot(cx, cy, 4, angleDeg, 0.5, 0.5, s, s);
+        cueImg_->draw_rot(cxp, cyp, 4, angleDeg, 0.5, 0.5, s, s);
     }
 }
 
@@ -198,26 +337,20 @@ void GameWindow::drawHud() {
 
 void GameWindow::drawStart() {
     layoutStartBoxes();
-
-    // Raum
     Gosu::Graphics::draw_rect(0, 0, width(), height(), Gosu::Color::BLACK, 0);
 
-    // Tisch
-    double r = rail();
-    Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(255, 90, 60, 30), 1);
     if (felt_) {
-        double sx = (tableW_ - 2 * r) / felt_->width();
-        double sy = (tableH_ - 2 * r) / felt_->height();
-        felt_->draw(tableX_ + r, tableY_ + r, 2, sx, sy);
+        double sx = tableW_ / felt_->width();
+        double sy = tableH_ / felt_->height();
+        felt_->draw(tableX_, tableY_, 2, sx, sy);
     }
     else {
-        Gosu::Graphics::draw_rect(tableX_ + r, tableY_ + r, tableW_ - 2 * r, tableH_ - 2 * r,
-            Gosu::Color(30, 120, 40, 255), 2);
+        Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(30, 120, 40, 255), 2);
     }
 
-    std::string title = "8-Ball – Namen eingeben";
+    std::string title = "Billard – Namen eingeben";
     double tw = fontTitle_->text_width(title);
-    drawTextShadow(*fontTitle_, title, (width() - tw) / 2, tableY_ + r * 0.5, 3, Gosu::Color::WHITE);
+    drawTextShadow(*fontTitle_, title, (width() - tw) / 2, tableY_ + rail() * 0.5, 3, Gosu::Color::WHITE);
 
     Gosu::Color frame(200, 50, 50, 50);
     Gosu::Graphics::draw_rect(p1Box_.x, p1Box_.y, p1Box_.w, p1Box_.h, frame, 3);
@@ -233,7 +366,7 @@ void GameWindow::drawStart() {
 
     std::string hint = "ENTER: Start   |   KLICK/TAB: Feld wechseln   |   ESC: Beenden";
     double hw = font_->text_width(hint);
-    drawTextShadow(*font_, hint, (width() - hw) / 2, tableY_ + tableH_ - r - font_->height() - 6, 4, Gosu::Color::WHITE);
+    drawTextShadow(*font_, hint, (width() - hw) / 2, tableY_ + tableH_ - rail() - font_->height() - 6, 4, Gosu::Color::WHITE);
 }
 
 void GameWindow::drawPause() {
@@ -262,51 +395,49 @@ void GameWindow::drawGameOver() {
 }
 
 void GameWindow::draw() {
-    // Raum
     Gosu::Graphics::draw_rect(0, 0, width(), height(), Gosu::Color::BLACK, 0);
 
     // Tisch
-    double r = rail();
-    Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(255, 90, 60, 30), 1); // Holz
     if (felt_) {
-        double sx = (tableW_ - 2 * r) / felt_->width();
-        double sy = (tableH_ - 2 * r) / felt_->height();
-        felt_->draw(tableX_ + r, tableY_ + r, 2, sx, sy);
+        double sx = tableW_ / felt_->width();
+        double sy = tableH_ / felt_->height();
+        felt_->draw(tableX_, tableY_, 1, sx, sy);
     }
     else {
-        Gosu::Graphics::draw_rect(tableX_ + r, tableY_ + r, tableW_ - 2 * r, tableH_ - 2 * r,
-            Gosu::Color(30, 120, 40, 255), 2);
+        Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(30, 120, 40, 255), 1);
     }
 
-    // Taschen (an Innenmaß!)
+    // Taschen-Overlay
     Gosu::Color pc = Gosu::Color::BLACK;
-    double pr = game_.pocketR;
-    double ix = tableX_ + r, iy = tableY_ + r, iw = tableW_ - 2 * r, ih = tableH_ - 2 * r;
-    drawCircle(ix, iy, pr, pc, 3, 22);
-    drawCircle(ix + iw, iy, pr, pc, 3, 22);
-    drawCircle(ix, iy + ih, pr, pc, 3, 22);
-    drawCircle(ix + iw, iy + ih, pr, pc, 3, 22);
-    drawCircle(ix + iw / 2.0, iy, pr, pc, 3, 22);
-    drawCircle(ix + iw / 2.0, iy + ih, pr, pc, 3, 22);
+    for (const auto& pn : pocketsNorm_) {
+        double px = tableX_ + pn.nx * tableW_;
+        double py = tableY_ + pn.ny * tableH_;
+        double pr = pn.nr * std::min(tableW_, tableH_);
+        drawCircle(px, py, pr, pc, 3, kBallSegments);
+    }
 
-    // Kugeln (Bilder zentriert und skaliert auf Radius)
+    // --- Bälle zeichnen ---
     auto drawBall = [&](const Ball& b) {
         if (!b.inPlay) return;
+
+        // Schatten & Outline
+        drawCircle(b.x + kBallShadow_dx, b.y + kBallShadow_dy, b.r * kBallShadowMul, Gosu::Color(90, 0, 0, 0), 3, kBallSegments);
+        drawCircle(b.x, b.y, b.r + 1.0, Gosu::Color(200, 0, 0, 0), 4, kBallSegments);
+
         auto& img = ballImg_[b.id];
         if (img) {
-            double sx = (2 * b.r) / img->width();
-            double sy = (2 * b.r) / img->height();
-            img->draw_rot(b.x, b.y, 4, 0.0, 0.5, 0.5, sx, sy);
+            double sx = kBallImageScale * (2 * b.r) / img->width();
+            double sy = kBallImageScale * (2 * b.r) / img->height();
+            img->draw_rot(b.x, b.y, 5, 0.0, 0.5, 0.5, sx, sy);
         }
         else {
-            // Fallback: weißer Kreis
-            drawCircle(b.x, b.y, b.r, Gosu::Color::WHITE, 4, 28);
+            drawCircle(b.x, b.y, b.r, Gosu::Color::WHITE, 5, kBallSegments);
         }
         };
+
     for (const Ball& b : game_.balls()) drawBall(b);
     drawBall(game_.cue());
 
-    // Overlays
     switch (state_) {
     case UiState::Start:    drawStart(); break;
     case UiState::Paused:   drawAim(); drawHud(); drawPause(); break;
@@ -323,10 +454,9 @@ void GameWindow::shootFromAim() {
     double d = std::sqrt(dx * dx + dy * dy);
     if (d < 1.0) return;
     double nx = dx / d, ny = dy / d;
-    double force = 6.0 + 20.0 * power_;  // Stoßstärke
+    double force = 6.0 + 20.0 * power_;
     c.vx = -nx * force; c.vy = -ny * force;
     game_.beginShot();
-    cueAnimFrames_ = 10; // kurzer Vorwärtsstoß der Queue
 }
 
 void GameWindow::togglePause() {
@@ -381,5 +511,5 @@ void GameWindow::button_down(Gosu::Button b) {
 
 void GameWindow::button_up(Gosu::Button b) {
     if (b == Gosu::MS_LEFT && dragging_) { shootFromAim(); }
-    dragging_ = false; power_ = 0.0;
+    dragging_ = false;
 }

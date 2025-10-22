@@ -5,18 +5,22 @@
 #include <optional>
 #include "Ball.hpp"
 
+// *** globale Skalierung für die Ballgröße (Physik & damit auch Rendering) ***
+inline constexpr double BALL_SIZE_MUL = 1.40;
+
+struct PocketGeom { double x, y, r; };
+
 class Game {
 public:
     Game(double tableWidth, double tableHeight, int players = 2);
 
-    // Innenmaß des grünen Bereichs (links,oben,rechts,unten)
     void set_playfield(double left, double top, double right, double bottom);
+    void set_pockets(std::vector<PocketGeom> pockets);
 
     bool allStopped() const;
     bool isOver() const { return gameOver_; }
     int  currentPlayer() const;
     int  winner() const { return winnerTeam_; }
-    int  numPlayers() const { return 2; }
     int  remainingSolids() const;
     int  remainingStripes() const;
 
@@ -29,17 +33,16 @@ public:
     const Ball& cue() const;
     const std::vector<Ball>& balls() const;
 
-    double W, H;            // Fenstergröße (Info)
-    double pocketR = 24.0;  // Taschenradius
+    double W, H;
+    double pocketR = 24.0;
 
 private:
-    // Spielbereich (Innenmaß des Filzes)
     double L_ = 0, T_ = 0, R_ = 0, B_ = 0;
-
-    double friction_ = 0.99; // Reibung
+    double friction_ = 0.99;
 
     Ball cueBall_;
     std::vector<Ball> balls_;
+    std::vector<PocketGeom> pockets_;
 
     int  currentTeam_ = 0;
     bool gameOver_ = false;
@@ -60,11 +63,14 @@ private:
         std::vector<int> pocketedIds;
     } turn_;
 
-    void placeTriangle();             // 8-Ball Aufbau
-    void step(Ball& b);               // Position+Reibung
-    void wall(Ball& b) const;         // Bandenabprall
-    bool pocket(const Ball& b) const; // versenkt?
-    void collide(Ball& a, Ball& b);   // elastischer Stoß
+    static double baseBallRadius() { return 10.0; }
+    static double defaultBallRadius() { return baseBallRadius() * BALL_SIZE_MUL; }
+
+    void placeTriangle();
+    void step(Ball& b);
+    void wall(Ball& b) const;
+    bool pocket(const Ball& b) const;
+    void collide(Ball& a, Ball& b);
     void handleCollisions();
     void assignGroupsIfNeeded();
     void resolveTurnIfStopped();
