@@ -29,16 +29,22 @@ public:
     void beginShot();
     void notifyCueHitBall(int id);
 
+    // Sofort bis zum Stillstand vorsimulieren (für SPACE / Timeout)
+    void fastForwardToRest();
+
     Ball& cue();
     const Ball& cue() const;
     const std::vector<Ball>& balls() const;
+
+    // Für HUD: ggf. Gruppe eines Spielers (VOLLE/HALBE), sonst leer
+    std::optional<BallType> groupOfPlayer(int p) const { return playerGroup_[p]; }
 
     double W, H;
     double pocketR = 24.0;
 
 private:
     double L_ = 0, T_ = 0, R_ = 0, B_ = 0;
-    double friction_ = 0.99;
+    double friction_ = 0.984; // etwas stärker, damit Kugeln kürzer rollen
 
     Ball cueBall_;
     std::vector<Ball> balls_;
@@ -54,6 +60,10 @@ private:
     bool anyMoving_ = false;
     bool lastMoving_ = false;
     std::optional<int> firstHitBallId_;
+
+    // Auto-Vorspulen, falls Stoß zu lange dauert
+    int  shotFrames_ = 0;
+    static constexpr int kShotTimeoutFrames_ = 8 * 60; // ~8s @60fps
 
     struct TurnResult {
         bool foul = false;

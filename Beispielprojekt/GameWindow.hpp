@@ -29,11 +29,13 @@ private:
 
     Game game_;
 
-    // Zielhilfe / Stoß
+    // Zielen / Stoß
     bool   dragging_ = false;
-    double aimX_ = 0.0, aimY_ = 0.0;
-    double power_ = 0.0;
-    int    cueAnimFrames_ = 0;
+    double aimX_ = 0.0, aimY_ = 0.0;   // Mausposition
+    double power_ = 0.0;               // 0..1 (für Physik)
+    int    cueAnimFrames_ = 0;         // Vorwärts-Animation nach Loslassen
+    double cueBackDist_ = 0.0;         // aktuelle Rückzugsdistanz in Pixeln
+    double cuePullStart_ = 0.0;        // Projektion beim Drücken (für relatives Ziehen)  <<< NEU
 
     // Spielernamen (Startbild)
     std::string p1Name_ = "Spieler 1";
@@ -56,15 +58,15 @@ private:
     void loadAssets();
     static std::string ballFile(int id);
 
-	// Layout / Hiferoutinen
-	double rail() const;         // nur äußere Umrandung
+    // Layout / Hilfen
+    double rail() const;
     void ensureFonts();
     void layoutStartBoxes();
     void computeTableRect();
 
     // Zeichnen
     void drawCircle(double cx, double cy, double r, Gosu::Color c, double z = 1.0, int seg = 28);
-    void drawAim();
+    void drawAim();      // zeichnet NUR den Queue (keine gestrichelte Linie mehr)
     void drawHud();
     void drawStart();
     void drawPause();
@@ -85,8 +87,8 @@ private:
     struct NormPocket { double nx = 0.0, ny = 0.0, nr = 0.05; }; // normiert 0..1
     std::array<NormPocket, 6> pocketsNorm_{};
 
-    void analyzeTableImage();       // PNG -> Normdaten
-    void rebuildGameGeomFromNorm(); // Normdaten -> Bildschirm + Game
+    void analyzeTableImage();
+    void rebuildGameGeomFromNorm();
 };
 
 #endif

@@ -9,7 +9,7 @@ struct Ball {
     int id;            // 0=weiﬂ, 1..7 volle, 8=schwarz, 9..15 halbe
     BallType type;
     double x, y;       // Position (Pixel)
-    double vx = 0.0, vy = 0.0;   // Geschwindigkeit
+    double vx = 0.00, vy = 0.00;   // Geschwindigkeit
     double r = 10.0;            // Radius (Pixel)
     bool   inPlay = true;        // im Spiel?
 

@@ -1,4 +1,4 @@
-#include "GameWindow.hpp"
+﻿#include "GameWindow.hpp"
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -6,17 +6,24 @@
 
 static inline double clamp01(double x) { return std::max(0.0, std::min(1.0, x)); }
 
-// Heuristiken f�r PNG-Analyse
+// Heuristiken für PNG-Analyse
 static inline bool isGreen(int r, int g, int b) { return g > 70 && g > int(r * 1.15) && g > int(b * 1.15); }
 static inline bool isDark(int r, int g, int b) { return r < 40 && g < 40 && b < 40; }
 
-// ---------- Rendering- und Lade-Optionen ----------
-static constexpr double kBallImageScale = 1.00;     // *** WICHTIG: 1.00 -> Physik bestimmt Gr��e ***/ da sonst bilder ienfach nur gr��er dargestl werdne aber physik nicht passt 
+// ---------- Optionen ----------
+static constexpr double kBallImageScale = 1.00;     // Bildgröße = Physik
 static constexpr double kBallShadowMul = 1.06;
 static constexpr double kBallShadow_dx = 2.0;
 static constexpr double kBallShadow_dy = 2.0;
 static constexpr int    kBallSegments = 28;
 
+// Queue-Parameter
+static constexpr double kCueMaxBackPx = 320.0;   // max. Rückzug
+static constexpr double kCueMinBackPx = 40.0;    // Basis-Rückzug
+static constexpr int    kCueFireFrames = 10;     // Vorwärts-Anim-Dauer (Frames)
+static constexpr double kCueThicknessPx = 8.0;   // Dicke/Skalierung
+
+// Für Upscaling
 static constexpr unsigned kBallImageFlags =
 #ifdef IF_RETRO
 Gosu::IF_RETRO;
@@ -24,15 +31,15 @@ Gosu::IF_RETRO;
 Gosu::IF_SMOOTH;
 #endif
 
-// ---------- robustes Image-Loading ----------
+// ---------- robuster Image-Load ----------
 static std::string ascii_fallback(std::string s) {
     auto repl = [&](const std::string& from, const std::string& to) {
         size_t pos = 0;
         while ((pos = s.find(from, pos)) != std::string::npos) { s.replace(pos, from.size(), to); pos += to.size(); }
         };
-    repl("�", "ae"); repl("�", "oe"); repl("�", "ue");
-    repl("�", "Ae"); repl("�", "Oe"); repl("�", "Ue");
-    repl("�", "ss");
+    repl("ä", "ae"); repl("ö", "oe"); repl("ü", "ue");
+    repl("Ä", "Ae"); repl("Ö", "Oe"); repl("Ü", "Ue");
+    repl("ß", "ss");
     return s;
 }
 static std::string no_spaces(std::string s) {
@@ -40,29 +47,26 @@ static std::string no_spaces(std::string s) {
     return s;
 }
 static std::unique_ptr<Gosu::Image> try_load_variants(const std::string& baseName, unsigned flags) {
-    std::vector<std::string> cand = {
-        baseName,
-        ascii_fallback(baseName),
-        no_spaces(baseName),
-        no_spaces(ascii_fallback(baseName))
-    };
+    std::vector<std::string> cand = { baseName, ascii_fallback(baseName), no_spaces(baseName), no_spaces(ascii_fallback(baseName)) };
     for (const auto& f : cand) {
         try { return std::make_unique<Gosu::Image>(f, flags); }
-        catch (...) { /* n�chste Variante */ }
+        catch (...) {}
     }
     return nullptr;
 }
 
+// ---------- Konstruktor ----------
 GameWindow::GameWindow(unsigned width, unsigned height, int /*players*/, bool fullscreen)
     : Gosu::Window(width, height, fullscreen, 60.0),
     game_(width, height, 2)
 {
-    set_caption("Gosu Billard (Bilder)");
+    set_caption("Gosu Billard");
     loadAssets();
     ensureFonts();
     computeTableRect();
 }
 
+// ---------- Assets laden ----------
 void GameWindow::loadAssets() {
     // Tisch & Queue
     try { felt_ = try_load_variants("Tisch.png", Gosu::IF_SMOOTH); }
@@ -106,6 +110,7 @@ std::string GameWindow::ballFile(int id) {
     }
 }
 
+// ---------- Layout ----------
 double GameWindow::rail() const {
     double r = std::min(tableW_, tableH_) * 0.05;
     return std::max(18.0, std::min(56.0, r));
@@ -134,11 +139,15 @@ void GameWindow::computeTableRect() {
     tableY_ = (height() - tableH_) / 2.0;
 }
 
+// ---------- Startscreen-Layout ----------
 void GameWindow::layoutStartBoxes() {
     computeTableRect();
-    double r = rail(), bh = std::max(36.0, height() * 0.06);
-    double bx = tableX_ + tableW_ * 0.18, bw = tableW_ * 0.64;
-    double y1 = tableY_ + r + tableH_ * 0.20, y2 = y1 + bh + std::max(24.0, height() * 0.05);
+    double r = rail();
+    double bh = std::max(36.0, height() * 0.06);
+    double bx = tableX_ + tableW_ * 0.18;
+    double bw = tableW_ * 0.64;
+    double y1 = tableY_ + r + tableH_ * 0.20;
+    double y2 = y1 + bh + std::max(24.0, height() * 0.05);
     p1Box_ = { bx, y1, bw, bh };
     p2Box_ = { bx, y2, bw, bh };
 }
@@ -169,69 +178,17 @@ void GameWindow::analyzeTableImage() {
         feltNorm_ = { 0.08,0.08,0.92,0.92 };
         feltOk_ = false;
     }
-
-    const double cx = (feltNorm_.l + feltNorm_.r) * 0.5;
-    const double cy = (feltNorm_.t + feltNorm_.b) * 0.5;
-    const std::array<std::pair<double, double>, 6> guesses = { {
-        {feltNorm_.l, feltNorm_.t}, {feltNorm_.r, feltNorm_.t},
-        {feltNorm_.l, feltNorm_.b}, {feltNorm_.r, feltNorm_.b},
-        {cx,           feltNorm_.t}, {cx,           feltNorm_.b}
-    } };
-
-    const int win = std::max(10, std::min(imgW, imgH) / 20);
-    auto clampi = [](int v, int lo, int hi) { return std::max(lo, std::min(hi, v)); };
-
-    for (int i = 0; i < 6; ++i) {
-        int gx = int(guesses[i].first * imgW), gy = int(guesses[i].second * imgH);
-        int x0 = clampi(gx - win, 0, imgW - 1), x1 = clampi(gx + win, 0, imgW - 1);
-        int y0 = clampi(gy - win, 0, imgH - 1), y1 = clampi(gy + win, 0, imgH - 1);
-
-        long long sx = 0, sy = 0, n = 0; double maxR2 = 0.0;
-
-        for (int y = y0; y <= y1; ++y) for (int x = x0; x <= x1; ++x) {
-            Gosu::Color c = bmp.get_pixel(x, y);
-            if (!isDark(c.red(), c.green(), c.blue())) continue;
-            sx += x; sy += y; ++n;
-        }
-
-        double cxp = gx, cyp = gy;
-        if (n > 50) {
-            cxp = double(sx) / n; cyp = double(sy) / n;
-            for (int y = y0; y <= y1; ++y) for (int x = x0; x <= x1; ++x) {
-                Gosu::Color c = bmp.get_pixel(x, y);
-                if (!isDark(c.red(), c.green(), c.blue())) continue;
-                double dx = x - cxp, dy = y - cyp; double d2 = dx * dx + dy * dy; if (d2 > maxR2) maxR2 = d2;
-            }
-        }
-        else {
-            maxR2 = (win * 0.6) * (win * 0.6);
-        }
-
-        pocketsNorm_[i].nx = cxp / imgW;
-        pocketsNorm_[i].ny = cyp / imgH;
-        pocketsNorm_[i].nr = std::max(0.01, std::min(0.08, std::sqrt(maxR2) / double(std::min(imgW, imgH))));
-    }
 }
 
-// ---------- Normdaten -> Bildschirm & Game ----------
 void GameWindow::rebuildGameGeomFromNorm() {
     double ix = tableX_ + feltNorm_.l * tableW_;
     double iy = tableY_ + feltNorm_.t * tableH_;
     double iw = (feltNorm_.r - feltNorm_.l) * tableW_;
     double ih = (feltNorm_.b - feltNorm_.t) * tableH_;
     game_.set_playfield(ix, iy, ix + iw, iy + ih);
-
-    std::vector<PocketGeom> P; P.reserve(6);
-    double shortEdge = std::min(tableW_, tableH_);
-    for (const auto& pn : pocketsNorm_) {
-        double px = tableX_ + pn.nx * tableW_;
-        double py = tableY_ + pn.ny * tableH_;
-        double pr = pn.nr * shortEdge;
-        P.push_back({ px, py, pr });
-    }
-    game_.set_pockets(P);
 }
 
+// ---------- Update ----------
 void GameWindow::update() {
     ensureFonts();
     computeTableRect();
@@ -247,19 +204,35 @@ void GameWindow::update() {
     aimX_ = input().mouse_x();
     aimY_ = input().mouse_y();
 
+    // Ziehen mit LINKER Maustaste: Rückzug relativ zur Startprojektion
     if (dragging_ && game_.allStopped()) {
-        double dx = aimX_ - game_.cue().x, dy = aimY_ - game_.cue().y;
-        double d = std::sqrt(dx * dx + dy * dy);
-        power_ = clamp01(std::min(300.0, d) / 300.0);
+        const Ball& c = game_.cue();
+        double dx = aimX_ - c.x, dy = aimY_ - c.y;
+        double d = std::max(1.0, std::sqrt(dx * dx + dy * dy));
+        double nx = dx / d, ny = dy / d;
+
+        // Abstand entlang Queue-Richtung (+n)
+        double proj = dx * nx + dy * ny;                  // >= 0 auf Maus-Seite
+        double pull = std::max(0.0, proj - cuePullStart_); // relativ zum Druckzeitpunkt
+
+        cueBackDist_ = std::min(kCueMaxBackPx, kCueMinBackPx + pull);
+        power_ = clamp01(cueBackDist_ / kCueMaxBackPx);
     }
 
-    if (cueAnimFrames_ > 0) --cueAnimFrames_;
+    // sichtbarer Vorwärtshub nach dem Loslassen, danach wieder einfahren
+    if (cueAnimFrames_ > 0) {
+        double t = 1.0 - (double)cueAnimFrames_ / (double)kCueFireFrames; // 0..1
+        double forward = (1.0 - t) * cueBackDist_;
+        cueBackDist_ = forward;
+        --cueAnimFrames_;
+        if (cueAnimFrames_ == 0) cueBackDist_ = 0.0;
+    }
 
     game_.update();
     if (game_.isOver()) state_ = UiState::GameOver;
 }
 
-// Hilfs-Kreis (Schatten/Outline)
+// ---------- Zeichnen ----------
 void GameWindow::drawCircle(double cx, double cy, double r, Gosu::Color color, double z, int seg) {
     const double step = 2 * 3.14159265358979323846 / seg;
     double px = cx + r, py = cy;
@@ -271,47 +244,37 @@ void GameWindow::drawCircle(double cx, double cy, double r, Gosu::Color color, d
     }
 }
 
+// Text-Schatten
 void GameWindow::drawTextShadow(Gosu::Font& f, const std::string& s, double x, double y, double z, Gosu::Color col) {
     f.draw_text(s, x + 1, y + 1, z, 1.0, 1.0, Gosu::Color(200, 0, 0, 0));
     f.draw_text(s, x, y, z, 1.0, 1.0, col);
 }
 
+// nur der Queue (kein Strich)
 void GameWindow::drawAim() {
-    if (!game_.allStopped() || game_.isOver()) return;
+    if (!game_.allStopped() || game_.isOver() || !cueImg_) return;
 
     const Ball& c = game_.cue();
     double dx = aimX_ - c.x, dy = aimY_ - c.y;
     double d = std::sqrt(dx * dx + dy * dy);
     if (d < 1.0) return;
+
     double nx = dx / d, ny = dy / d;
 
-    double len = std::min(d, 340.0);
-    Gosu::Color lc(200, 255, 255, 255);
-    const int dashN = 24;
-    for (int i = 0;i < dashN;++i) {
-        double t0 = (len / dashN) * i, t1 = (len / dashN) * (i + 0.55);
-        double x0 = c.x + nx * t0, y0 = c.y + ny * t0;
-        double x1 = c.x + nx * t1, y1 = c.y + ny * t1;
-        Gosu::Graphics::draw_line(x0, y0, lc, x1, y1, lc, 3);
-    }
+    // Queue-Größe ~ frühere Strichdicke
+    double s = kCueThicknessPx / std::max(1.0, (double)cueImg_->height());
+    double cueLen = cueImg_->width() * s;
 
-    if (cueImg_) {
-        const double baseBack = 40.0;
-        double back = baseBack + 160.0 * power_;
-        if (cueAnimFrames_ > 0) {
-            double t = cueAnimFrames_ / 10.0;
-            back *= t;
-        }
+    // Mittelpunkt des Queue hinter der Spitze
+    double safeGap = c.r * 0.25;
+    double offset = (c.r + safeGap + cueBackDist_ + cueLen * 0.5);
 
-        double angleDeg = std::atan2(dy, dx) * 180.0 / 3.14159265;
-        double s = std::max(0.35, tableH_ / 900.0);
-        double cueLen = cueImg_->width() * s;
+    // Queue auf Maus-Seite (+n)
+    double cxp = c.x + nx * offset;
+    double cyp = c.y + ny * offset;
 
-        double cxp = c.x - nx * (c.r + back + cueLen * 0.5);
-        double cyp = c.y - ny * (c.r + back + cueLen * 0.5);
-
-        cueImg_->draw_rot(cxp, cyp, 4, angleDeg, 0.5, 0.5, s, s);
-    }
+    double angleDeg = std::atan2(dy, dx) * 180.0 / 3.14159265;
+    cueImg_->draw_rot(cxp, cyp, 4, angleDeg, 0.5, 0.5, s, s);
 }
 
 void GameWindow::drawHud() {
@@ -323,13 +286,29 @@ void GameWindow::drawHud() {
     Gosu::Color a = (turn == 0) ? Gosu::Color::WHITE : Gosu::Color(220, 220, 220, 255);
     Gosu::Color b = (turn == 1) ? Gosu::Color::WHITE : Gosu::Color(220, 220, 220, 255);
 
-    std::string l = " " + p1Name_ + "  (volle: " + std::to_string(game_.remainingSolids()) + ")";
-    std::string r = " " + p2Name_ + "  (halbe: " + std::to_string(game_.remainingStripes()) + ")";
+    // --- Links/Rechts: erst NACH Zuweisung Gruppen + Restanzahl anzeigen ---
+    std::string leftText = " " + p1Name_;
+    std::string rightText = " " + p2Name_;
 
-    drawTextShadow(*font_, l, 12, y + 6, 6, a);
-    double rw = font_->text_width(r);
-    drawTextShadow(*font_, r, width() - 12 - rw, y + 6, 6, b);
+    auto g0 = game_.groupOfPlayer(0);
+    auto g1 = game_.groupOfPlayer(1);
+    int solidLeft = game_.remainingSolids();
+    int stripeLeft = game_.remainingStripes();
 
+    if (g0.has_value()) {
+        if (g0.value() == BallType::SOLID)  leftText += "  (volle: " + std::to_string(solidLeft) + ")";
+        else                                leftText += "  (halbe: " + std::to_string(stripeLeft) + ")";
+    }
+    if (g1.has_value()) {
+        if (g1.value() == BallType::SOLID)  rightText += "  (volle: " + std::to_string(solidLeft) + ")";
+        else                                rightText += "  (halbe: " + std::to_string(stripeLeft) + ")";
+    }
+
+    drawTextShadow(*font_, leftText, 12, y + 6, 6, a);
+    double rw = font_->text_width(rightText);
+    drawTextShadow(*font_, rightText, width() - 12 - rw, y + 6, 6, b);
+
+    // --- Mitte: nur „<Name> ist am Zug“ ---
     std::string mid = (turn == 0 ? p1Name_ : p2Name_) + std::string(" ist am Zug");
     double mw = font_->text_width(mid);
     drawTextShadow(*font_, mid, (width() - mw) / 2.0, y + 6, 6, Gosu::Color(255, 220, 0, 255));
@@ -348,7 +327,7 @@ void GameWindow::drawStart() {
         Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(30, 120, 40, 255), 2);
     }
 
-    std::string title = "Billard � Namen eingeben";
+    std::string title = "8-Ball – Namen eingeben";
     double tw = fontTitle_->text_width(title);
     drawTextShadow(*fontTitle_, title, (width() - tw) / 2, tableY_ + rail() * 0.5, 3, Gosu::Color::WHITE);
 
@@ -407,23 +386,11 @@ void GameWindow::draw() {
         Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(30, 120, 40, 255), 1);
     }
 
-    // Taschen-Overlay
-    Gosu::Color pc = Gosu::Color::BLACK;
-    for (const auto& pn : pocketsNorm_) {
-        double px = tableX_ + pn.nx * tableW_;
-        double py = tableY_ + pn.ny * tableH_;
-        double pr = pn.nr * std::min(tableW_, tableH_);
-        drawCircle(px, py, pr, pc, 3, kBallSegments);
-    }
-
-    // --- B�lle zeichnen ---
+    // Bälle
     auto drawBall = [&](const Ball& b) {
         if (!b.inPlay) return;
-
-        // Schatten & Outline
         drawCircle(b.x + kBallShadow_dx, b.y + kBallShadow_dy, b.r * kBallShadowMul, Gosu::Color(90, 0, 0, 0), 3, kBallSegments);
         drawCircle(b.x, b.y, b.r + 1.0, Gosu::Color(200, 0, 0, 0), 4, kBallSegments);
-
         auto& img = ballImg_[b.id];
         if (img) {
             double sx = kBallImageScale * (2 * b.r) / img->width();
@@ -434,29 +401,38 @@ void GameWindow::draw() {
             drawCircle(b.x, b.y, b.r, Gosu::Color::WHITE, 5, kBallSegments);
         }
         };
-
     for (const Ball& b : game_.balls()) drawBall(b);
     drawBall(game_.cue());
 
+    // Queue (statt Strich)
+    drawAim();
+
     switch (state_) {
     case UiState::Start:    drawStart(); break;
-    case UiState::Paused:   drawAim(); drawHud(); drawPause(); break;
-    case UiState::GameOver: drawAim(); drawHud(); drawGameOver(); break;
-    case UiState::Playing:  drawAim(); drawHud(); break;
+    case UiState::Paused:   drawHud(); drawPause(); break;
+    case UiState::GameOver: drawHud(); drawGameOver(); break;
+    case UiState::Playing:  drawHud(); break;
     }
 }
 
+// ---------- Aktionen ----------
 void GameWindow::shootFromAim() {
     if (state_ != UiState::Playing) return;
     if (!game_.allStopped() || game_.isOver()) return;
+
+    // Stoß in Physik
     Ball& c = game_.cue();
     double dx = aimX_ - c.x, dy = aimY_ - c.y;
     double d = std::sqrt(dx * dx + dy * dy);
     if (d < 1.0) return;
     double nx = dx / d, ny = dy / d;
-    double force = 6.0 + 20.0 * power_;
+
+    double force = 6.0 + 20.0 * power_;   // Power aus Rückzug
     c.vx = -nx * force; c.vy = -ny * force;
     game_.beginShot();
+
+    // Vorwärts-Animation (Queue schlägt sichtbar nach vorn & fährt dann ein)
+    cueAnimFrames_ = kCueFireFrames;
 }
 
 void GameWindow::togglePause() {
@@ -473,10 +449,8 @@ void GameWindow::startMatch() {
 
 void GameWindow::handleNameKey(Gosu::Button b) {
     std::string& s = (activeName_ == 0) ? p1Name_ : p2Name_;
-
     if (b == Gosu::KB_BACKSPACE) { if (!s.empty()) s.pop_back(); return; }
     if (b == Gosu::KB_RETURN) { startMatch(); return; }
-
     if (b >= Gosu::KB_A && b <= Gosu::KB_Z) { char ch = 'A' + (int(b) - int(Gosu::KB_A)); s.push_back(ch); return; }
     if (b >= Gosu::KB_0 && b <= Gosu::KB_9) { char ch = '0' + (int(b) - int(Gosu::KB_0)); s.push_back(ch); return; }
     if (b == Gosu::KB_SPACE) { s.push_back(' '); return; }
@@ -500,8 +474,26 @@ void GameWindow::button_down(Gosu::Button b) {
         return;
     }
 
-    if (b == Gosu::MS_LEFT && state_ == UiState::Playing && game_.allStopped() && !game_.isOver())
+    // *** NEU: Leertaste = Vorspulen/Abschließen ***
+    if (b == Gosu::KB_SPACE && state_ == UiState::Playing && !game_.isOver()) {
+        game_.fastForwardToRest();
+        return;
+    }
+
+    // LINKE Maustaste fürs Ziehen
+    if (b == Gosu::MS_LEFT && state_ == UiState::Playing && game_.allStopped() && !game_.isOver()) {
         dragging_ = true;
+
+        // Start-Projektion merken (relatives Ziehen)
+        const Ball& c = game_.cue();
+        double dx = input().mouse_x() - c.x;
+        double dy = input().mouse_y() - c.y;
+        double d = std::max(1.0, std::sqrt(dx * dx + dy * dy));
+        double nx = dx / d, ny = dy / d;
+        cuePullStart_ = dx * nx + dy * ny;
+
+        cueBackDist_ = kCueMinBackPx; // kleines Grund-Feedback
+    }
 
     if (b == Gosu::KB_P && (state_ == UiState::Playing || state_ == UiState::Paused)) togglePause();
     if (b == Gosu::KB_R && state_ != UiState::Start) game_.reset(true);
@@ -510,6 +502,8 @@ void GameWindow::button_down(Gosu::Button b) {
 }
 
 void GameWindow::button_up(Gosu::Button b) {
-    if (b == Gosu::MS_LEFT && dragging_) { shootFromAim(); }
+    if (b == Gosu::MS_LEFT && dragging_) {
+        shootFromAim();         // Stoß + Vorwärts-Anim; danach fährt der Queue wieder ein
+    }
     dragging_ = false;
 }

@@ -20,7 +20,7 @@ Game::Game(double tableWidth, double tableHeight, int /*players*/)
 
 void Game::set_playfield(double left, double top, double right, double bottom) {
     L_ = left; T_ = top; R_ = right; B_ = bottom;
-    pocketR = std::max(defaultBallRadius() * 1.6, 20.0); // Fallback an neue Größe koppeln
+    pocketR = std::max(defaultBallRadius() * 1.6, 20.0);
 }
 
 void Game::set_pockets(std::vector<PocketGeom> pockets) {
@@ -34,6 +34,7 @@ void Game::reset(bool keepScores) {
     turn_ = {};
     firstHitBallId_.reset();
     shotActive_ = false;
+    shotFrames_ = 0;
 
     if (!keepScores) currentTeam_ = 0;
 
@@ -84,7 +85,7 @@ int Game::remainingStripes() const {
     int n = 0; for (const auto& b : balls_) if (b.inPlay && b.type == BallType::STRIPE) ++n; return n;
 }
 
-void Game::beginShot() { shotActive_ = true; turn_ = {}; firstHitBallId_.reset(); }
+void Game::beginShot() { shotActive_ = true; turn_ = {}; firstHitBallId_.reset(); shotFrames_ = 0; }
 void Game::notifyCueHitBall(int id) { if (!firstHitBallId_.has_value()) firstHitBallId_ = id; }
 
 bool Game::isOwnType(const Ball& b, int player) const {
@@ -120,7 +121,6 @@ bool Game::pocket(const Ball& b) const {
         return false;
     }
 
-    // Fallback: 6 Standardpositionen an den Ecken/Mitte
     struct P { double x, y; };
     P p[6] = {
         {L_,T_},{R_,T_},{L_,B_},{R_,B_},{(L_ + R_) / 2.0,T_},{(L_ + R_) / 2.0,B_}
@@ -170,12 +170,14 @@ void Game::handleCollisions() {
 
 void Game::assignGroupsIfNeeded() {
     if (groupsAssigned_) return;
+
     bool pocketedSolid = false, pocketedStripe = false;
     for (int id : turn_.pocketedIds) {
         if (id >= 1 && id <= 7) pocketedSolid = true;
         else if (id >= 9 && id <= 15) pocketedStripe = true;
     }
-    if (turn_.foul) return;
+
+    if (turn_.foul) return;              // bei Foul keine Zuweisung
     if (pocketedSolid ^ pocketedStripe) {
         groupsAssigned_ = true;
         playerGroup_[currentTeam_] = pocketedSolid ? BallType::SOLID : BallType::STRIPE;
@@ -209,8 +211,49 @@ void Game::resolveTurnIfStopped() {
     }
 
     shotActive_ = false;
+    shotFrames_ = 0;
     turn_ = {};
     firstHitBallId_.reset();
+}
+
+void Game::fastForwardToRest() {
+    if (gameOver_) return;
+
+    // Simuliere bis zum Stillstand mit gleicher Logik
+    const int maxIters = 2000; // Safety
+    for (int iter = 0; iter < maxIters; ++iter) {
+        anyMoving_ = false;
+
+        step(cueBall_);
+        for (auto& b : balls_) step(b);
+
+        // Versenken/Entfernen auch im FF
+        for (size_t i = 0;i < balls_.size();++i) {
+            Ball& ball = balls_[i];
+            if (!ball.inPlay) continue;
+            if (pocket(ball)) {
+                if (ball.type == BallType::EIGHT) turn_.pocketedEight = true;
+                else {
+                    turn_.anyPocket = true;
+                    turn_.pocketedIds.push_back(ball.id);
+                    if (groupsAssigned_ && isOwnType(ball, currentTeam_)) turn_.scoredOwn = true;
+                }
+                ball.inPlay = false; ball.vx = ball.vy = 0;
+                balls_.erase(balls_.begin() + i); --i;
+            }
+        }
+
+        handleCollisions();
+
+        auto moving = [&](const Ball& x) { return x.inPlay && len(x.vx, x.vy) >= 0.08; };
+        if (cueBall_.inPlay && moving(cueBall_)) anyMoving_ = true;
+        for (auto& b : balls_) if (moving(b)) { anyMoving_ = true; break; }
+
+        if (!anyMoving_) break;
+    }
+
+    lastMoving_ = false;
+    resolveTurnIfStopped();
 }
 
 void Game::update() {
@@ -251,6 +294,15 @@ void Game::update() {
     auto moving = [&](const Ball& x) { return x.inPlay && len(x.vx, x.vy) >= 0.08; };
     if (cueBall_.inPlay && moving(cueBall_)) anyMoving_ = true;
     for (auto& b : balls_) if (moving(b)) { anyMoving_ = true; break; }
+
+    // Timeout → automatisch vorspulen
+    if (shotActive_) {
+        ++shotFrames_;
+        if (shotFrames_ > kShotTimeoutFrames_) {
+            fastForwardToRest();
+            return;
+        }
+    }
 
     if (!anyMoving_ && lastMoving_) resolveTurnIfStopped();
     lastMoving_ = anyMoving_;
