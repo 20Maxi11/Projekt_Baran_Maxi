@@ -327,7 +327,7 @@ void GameWindow::drawStart() {
         Gosu::Graphics::draw_rect(tableX_, tableY_, tableW_, tableH_, Gosu::Color(30, 120, 40, 255), 2);
     }
 
-    std::string title = "8-Ball – Namen eingeben";
+    std::string title = "Billard – Namen eingeben";
     double tw = fontTitle_->text_width(title);
     drawTextShadow(*fontTitle_, title, (width() - tw) / 2, tableY_ + rail() * 0.5, 3, Gosu::Color::WHITE);
 
