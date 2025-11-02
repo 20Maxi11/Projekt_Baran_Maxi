@@ -172,6 +172,18 @@ void GameWindow::analyzeTableImage() {
     if (minX < maxX && minY < maxY) {
         feltNorm_.l = double(minX) / imgW; feltNorm_.r = double(maxX) / imgW;
         feltNorm_.t = double(minY) / imgH; feltNorm_.b = double(maxY) / imgH;
+		// ----Anpassung: Bande oben/unten um 3,790854628568 % schmäler----
+		// ----Anpassung: Bande links/rechts um 2,071661436276 % schmäler----
+        double cmToRelW = 0.03790854628568;
+		double cmToRelH = 0.02071661436276;
+		double shrinkLR = cmToRelH * (feltNorm_.r - feltNorm_.l);
+		double shrinkTB = cmToRelW * (feltNorm_.b - feltNorm_.t);
+		feltNorm_.l += shrinkLR;
+		feltNorm_.r -= shrinkLR;
+        feltNorm_.t += shrinkTB;
+		feltNorm_.b -= shrinkTB;
+
+        
         feltOk_ = true;
     }
     else {
