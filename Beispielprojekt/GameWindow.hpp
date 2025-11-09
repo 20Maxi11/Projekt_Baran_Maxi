@@ -29,66 +29,66 @@ private:
 
     Game game_;
 
-    // Zielen / Stoß
     bool   dragging_ = false;
-    double aimX_ = 0.0, aimY_ = 0.0;   // Mausposition
-    double power_ = 0.0;               // 0..1 (für Physik)
-    int    cueAnimFrames_ = 0;         // Vorwärts-Animation nach Loslassen
-    double cueBackDist_ = 0.0;         // aktuelle Rückzugsdistanz in Pixeln
-    double cuePullStart_ = 0.0;        // Projektion beim Drücken (für relatives Ziehen)  <<< NEU
+    double aimX_ = 0.0, aimY_ = 0.0;
+    double power_ = 0.0;
+    int    cueAnimFrames_ = 0;
+    double cueBackDist_ = 0.0;
+    double cuePullStart_ = 0.0;
 
-    // Spielernamen (Startbild)
     std::string p1Name_ = "Spieler 1";
     std::string p2Name_ = "Spieler 2";
     int activeName_ = 0;
     RectF p1Box_, p2Box_;
 
-    // Fonts
     std::unique_ptr<Gosu::Font> font_, fontTitle_;
     double lastW_ = 0, lastH_ = 0;
 
-    // Tisch-Geometrie (zentriert, 2:1)
     double tableX_ = 0, tableY_ = 0, tableW_ = 0, tableH_ = 0;
 
-    // Assets
-    std::unique_ptr<Gosu::Image> felt_;      // Tisch (PNG)
-    std::unique_ptr<Gosu::Image> cueImg_;    // Queue
-    std::array<std::unique_ptr<Gosu::Image>, 16> ballImg_; // 0..15
+    std::unique_ptr<Gosu::Image> felt_;
+    std::unique_ptr<Gosu::Image> cueImg_;
+    std::array<std::unique_ptr<Gosu::Image>, 16> ballImg_;
+
+    // --- Sound-Samples ---
+    std::unique_ptr<Gosu::Sample> sfxBall_;
+    std::unique_ptr<Gosu::Sample> sfxPocket_;
+    std::unique_ptr<Gosu::Sample> sfxRail_;
+    std::unique_ptr<Gosu::Sample> sfxWin_;
+    double sfxVolume_ = 1.0;
 
     void loadAssets();
+    void loadSounds();
     static std::string ballFile(int id);
 
-    // Layout / Hilfen
     double rail() const;
     void ensureFonts();
     void layoutStartBoxes();
     void computeTableRect();
 
-    // Zeichnen
     void drawCircle(double cx, double cy, double r, Gosu::Color c, double z = 1.0, int seg = 28);
-    void drawAim();      // zeichnet NUR den Queue (keine gestrichelte Linie mehr)
+    static void drawTextShadow(Gosu::Font& f, const std::string& s, double x, double y, double z, Gosu::Color col);
+
+    void drawAim();
     void drawHud();
     void drawStart();
     void drawPause();
     void drawGameOver();
-    static void drawTextShadow(Gosu::Font& f, const std::string& s, double x, double y, double z, Gosu::Color col);
 
-    // Aktionen
     void shootFromAim();
     void togglePause();
     void startMatch();
     void handleNameKey(Gosu::Button b);
 
-    // --- Bildanalyse & Mapping ---
+    // PNG : Spielfeld
     struct NormRect { double l = 0.08, t = 0.08, r = 0.92, b = 0.92; };
     NormRect feltNorm_;
     bool feltOk_ = false;
-
-    struct NormPocket { double nx = 0.0, ny = 0.0, nr = 0.05; }; // normiert 0..1
-    std::array<NormPocket, 6> pocketsNorm_{};
-
     void analyzeTableImage();
     void rebuildGameGeomFromNorm();
+
+    // Sound-Events aus Game abspielen
+    void playSoundEvents();
 };
 
 #endif

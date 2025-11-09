@@ -10,6 +10,19 @@ inline constexpr double BALL_SIZE_MUL = 1.40;
 
 struct PocketGeom { double x, y, r; };
 
+// ---- Sounds, die die Physik an das Window meldet ----
+enum class SoundEventType {
+    BallBall,
+    RailHit,
+    Pocket,
+    GameOver
+};
+
+struct SoundEvent {
+    SoundEventType type;
+    double volume;      // 0..1
+};
+
 class Game {
 public:
     Game(double tableWidth, double tableHeight, int players = 2);
@@ -29,22 +42,32 @@ public:
     void beginShot();
     void notifyCueHitBall(int id);
 
-    // Sofort bis zum Stillstand vorsimulieren (für SPACE / Timeout)
-    void fastForwardToRest();
-
+    // fürs Rendering
     Ball& cue();
     const Ball& cue() const;
     const std::vector<Ball>& balls() const;
 
-    // Für HUD: ggf. Gruppe eines Spielers (VOLLE/HALBE), sonst leer
-    std::optional<BallType> groupOfPlayer(int p) const { return playerGroup_[p]; }
-
+    // für Window
     double W, H;
     double pocketR = 24.0;
 
+    // Sound-Events abholen
+    const std::vector<SoundEvent>& soundEvents() const { return soundEvents_; }
+    void clearSoundEvents() { soundEvents_.clear(); }
+
+    // damit Leertaste sofort alles fertig rechnet
+    void fastForwardToRest();
+
+    // für HUD (du nutzt das im Window)
+    bool groupsAssigned() const { return groupsAssigned_; }
+    std::optional<BallType> groupOfPlayer(int p) const {
+        if (p < 0 || p > 1) return std::nullopt;
+        return playerGroup_[p];
+    }
+
 private:
     double L_ = 0, T_ = 0, R_ = 0, B_ = 0;
-    double friction_ = 0.984; // etwas stärker, damit Kugeln kürzer rollen
+    double friction_ = 0.99;
 
     Ball cueBall_;
     std::vector<Ball> balls_;
@@ -61,10 +84,6 @@ private:
     bool lastMoving_ = false;
     std::optional<int> firstHitBallId_;
 
-    // Auto-Vorspulen, falls Stoß zu lange dauert
-    int  shotFrames_ = 0;
-    static constexpr int kShotTimeoutFrames_ = 8 * 60; // ~8s @60fps
-
     struct TurnResult {
         bool foul = false;
         bool anyPocket = false;
@@ -73,12 +92,15 @@ private:
         std::vector<int> pocketedIds;
     } turn_;
 
+    // Sound-Puffer
+    std::vector<SoundEvent> soundEvents_;
+
     static double baseBallRadius() { return 10.0; }
     static double defaultBallRadius() { return baseBallRadius() * BALL_SIZE_MUL; }
 
     void placeTriangle();
     void step(Ball& b);
-    void wall(Ball& b) const;
+    void wall(Ball& b);
     bool pocket(const Ball& b) const;
     void collide(Ball& a, Ball& b);
     void handleCollisions();

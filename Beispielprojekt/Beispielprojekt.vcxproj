@@ -201,6 +201,11 @@
     <Image Include="Test.png" />
     <Image Include="Tisch.png" />
   </ItemGroup>
+  <ItemGroup>
+    <Media Include="ball_in_pocket.wav" />
+    <Media Include="billiard_ball_clack.wav" />
+    <Media Include="crowd_cheering.mp3" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
