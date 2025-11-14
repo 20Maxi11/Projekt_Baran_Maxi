@@ -180,6 +180,18 @@
     <ClInclude Include="GameWindow.hpp" />
   </ItemGroup>
   <ItemGroup>
+    <Image Include="avatar1.png" />
+    <Image Include="avatar10.png" />
+    <Image Include="avatar11.png" />
+    <Image Include="avatar12.png" />
+    <Image Include="avatar2.png" />
+    <Image Include="avatar3.png" />
+    <Image Include="avatar4.png" />
+    <Image Include="avatar5.png" />
+    <Image Include="avatar6.png" />
+    <Image Include="avatar7.png" />
+    <Image Include="avatar8.png" />
+    <Image Include="avatar9.png" />
     <Image Include="Kugel_0_weiss.png" />
     <Image Include="Kugel_10_blau_halb.png" />
     <Image Include="Kugel_11_rot_halb.png" />

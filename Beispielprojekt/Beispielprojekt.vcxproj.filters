@@ -100,6 +100,42 @@
     <Image Include="Kugel_0_weiss.png">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="avatar1.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar2.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar3.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar4.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar5.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar6.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar7.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar8.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar9.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar10.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar11.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="avatar12.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <Media Include="billiard_ball_clack.wav">
