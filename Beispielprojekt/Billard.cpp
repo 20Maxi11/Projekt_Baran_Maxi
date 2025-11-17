@@ -1,6 +1,7 @@
 #include <Gosu/Gosu.hpp>
 #include <Gosu/AutoLink.hpp>
 #include "GameWindow.hpp"
+// Hauptprogramm: Erzeugt das Spielfenster und startet die Billard-Anwendung.
 
 int main()
 {

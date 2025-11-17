@@ -1,3 +1,7 @@
+// Game: Zentrale Spiel-Logik 
+// Klasse kennt alle Kugeln, das Spielfeld, die Züge der Spieler
+// und wertet Fouls / versenkte Kugeln / Spielende aus.
+
 #ifndef GAME_HPP
 #define GAME_HPP
 
@@ -8,6 +12,8 @@
 // *** globale Skalierung für die Ballgröße (Physik & damit auch Rendering) ***
 inline constexpr double BALL_SIZE_MUL = 1.40;
 
+
+// x,y = Mittelpunkt der Tasche, r = Radius/bechreiben ein Taschen-Geometrie
 struct PocketGeom { double x, y, r; };
 
 // ---- Sounds, die die Physik an das Window meldet ----
@@ -23,6 +29,11 @@ struct SoundEvent {
     double volume;      // 0..1
 };
 
+
+//  - physikalische Simulation (Bewegung, Kollisionen, Bande, Taschen)
+//  - den aktuellen Spielzustand (wer ist dran, welche Gruppe, Fouls)
+//  - Regeln 
+//  - Sound-Ereignisse (Ball trifft Ball, Bande, Tasche, Spielende).
 class Game {
 public:
     Game(double tableWidth, double tableHeight, int players = 2);
